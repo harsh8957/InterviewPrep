@@ -1,0 +1,5 @@
+# GitHub Linguist Language Detection Customizations
+package-lock.json linguist-generated=true
+backend/package-lock.json linguist-generated=true
+frontend/package-lock.json linguist-generated=true
+*.json linguist-generated=true
