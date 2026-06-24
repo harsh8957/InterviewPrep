@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+
+venv/
+__pycache__/
+*.pyc
+
+backend/node_modules/
+frontend/node_modules/
+
+backend/dist/
+frontend/dist/
+
+debug.log
