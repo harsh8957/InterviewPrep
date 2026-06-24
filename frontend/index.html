@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="InterviewPrep — AI-powered mock interview platform. Practice with real questions, get personalized feedback, and land your dream job." />
+    <meta name="keywords" content="interview prep, mock interview, AI interview, job interview practice, career coaching" />
+    <meta property="og:title" content="InterviewPrep — AI-Powered Interview Practice" />
+    <meta property="og:description" content="Practice mock interviews with AI, get instant feedback, and ace your next job interview." />
+    <meta property="og:type" content="website" />
+    <meta name="theme-color" content="#6366f1" />
+    <title>InterviewPrep — AI-Powered Interview Practice</title>
+    <script>
+      // Apply dark mode from system preference before paint
+      (function() {
+        const saved = localStorage.getItem('ip-theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (saved === 'dark' || (!saved && prefersDark)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
