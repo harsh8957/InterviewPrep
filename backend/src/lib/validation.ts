@@ -56,3 +56,58 @@ export const createBlogSchema = z.object({
   status: z.enum(['draft', 'published']).optional().default('draft'),
   publishedAt: z.union([z.string(), z.date()]).optional(),
 });
+
+// Problem Management Schemas
+export const createProblemSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  slug: z.string().min(1, 'Slug is required'),
+  statement: z.string().min(1, 'Statement is required'),
+  difficulty: z.enum(['easy', 'medium', 'hard']),
+  topics: z.array(z.string()).min(1, 'At least one topic is required'),
+  patterns: z.array(z.string()).optional().default([]),
+  constraints: z.array(z.string()).min(1, 'At least one constraint is required'),
+  examples: z.array(
+    z.object({
+      input: z.string(),
+      output: z.string(),
+      explanation: z.string().optional(),
+    })
+  ).min(1, 'At least one example is required'),
+  starterCode: z.object({
+    cpp: z.string().optional(),
+    java: z.string().optional(),
+    python: z.string().optional(),
+    javascript: z.string().optional(),
+    typescript: z.string().optional(),
+  }).optional(),
+  hints: z.array(z.string()).optional().default([]),
+  editorial: z.string().optional(),
+  timeComplexity: z.string().optional(),
+  spaceComplexity: z.string().optional(),
+  status: z.enum(['published', 'draft']).optional().default('published'),
+  companyTags: z.array(z.string()).optional().default([]),
+  testCases: z.array(
+    z.object({
+      input: z.string(),
+      expectedOutput: z.string(),
+      isHidden: z.boolean().optional().default(false),
+      order: z.number().optional().default(1),
+    })
+  ).optional().default([]),
+});
+
+export const updateProblemSchema = createProblemSchema.partial();
+
+// Roadmap Management Schemas
+export const createRoadmapSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  slug: z.string().min(1, 'Slug is required'),
+  description: z.string().min(1, 'Description is required'),
+  category: z.string().min(1, 'Category is required'),
+  order: z.number().int().min(1),
+  prerequisites: z.array(z.string()).optional().default([]),
+  estimatedHours: z.number().min(1).default(4),
+  associatedProblemIds: z.array(z.string()).optional().default([]),
+});
+
+export const updateRoadmapSchema = createRoadmapSchema.partial();

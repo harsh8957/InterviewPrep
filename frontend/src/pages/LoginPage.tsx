@@ -64,10 +64,10 @@ const LoginPage = () => {
 
             <div className="mt-10 grid grid-cols-2 gap-4">
               {[
-                { value: '10K+', label: 'Interviews' },
-                { value: '95%', label: 'Success Rate' },
-                { value: '50+', label: 'Job Roles' },
-                { value: '4.9★', label: 'Rating' },
+                { value: 'Adaptive AI', label: 'Interview Practice' },
+                { value: '5 Tracks', label: 'Technical Roles' },
+                { value: '16 Patterns', label: 'DSA Curriculum' },
+                { value: 'Instant', label: 'Objective Feedback' },
               ].map(s => (
                 <div key={s.label} className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
                   <div className="text-2xl font-bold">{s.value}</div>

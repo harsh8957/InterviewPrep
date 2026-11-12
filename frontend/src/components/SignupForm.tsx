@@ -44,7 +44,7 @@ const SignupForm: React.FC = () => {
   const benefits = [
     'Unlimited AI-powered mock interviews',
     'Instant feedback on every answer',
-    '50+ job roles covered',
+    'Curated DSA & role-specific interview tracks',
     'Track your improvement over time',
   ];
 

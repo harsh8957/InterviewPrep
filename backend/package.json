@@ -8,7 +8,8 @@
     "start": "node dist/index.js",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "create-admin": "tsx src/scripts/createAdmin.ts"
+    "create-admin": "tsx src/scripts/createAdmin.ts",
+    "seed:dsa": "tsx src/scripts/seedDSA.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

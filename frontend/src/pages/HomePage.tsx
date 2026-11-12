@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 const stats = [
   { value: 'Adaptive AI', label: 'Real-Time Evaluation', icon: TrendingUp },
-  { value: '50+ Roles', label: 'Technical & CS Tracks', icon: Award },
+  { value: '5 Core Tracks', label: 'Web, App, ML, UX, Data', icon: Award },
   { value: 'Speech & Text', label: 'Voice & Written Analysis', icon: Users },
   { value: 'Zero Fake Data', label: 'Honest Scored Feedback', icon: Star },
 ];
@@ -268,8 +268,8 @@ const HomePage = () => {
                 <p className="text-sm text-muted-foreground">Detailed constructive feedback on every technical answer</p>
               </div>
               <div className="card p-6 flex flex-col gap-2 border-primary/20">
-                <div className="text-3xl font-bold text-gradient">50+ Roles</div>
-                <p className="text-sm text-muted-foreground">Frontend, Backend, ML, Mobile, DevOps, and CS domains</p>
+                <div className="text-3xl font-bold text-gradient">5 Core Tracks</div>
+                <p className="text-sm text-muted-foreground">Web Developer, Mobile App, ML/AI, UX Design & Data Science</p>
               </div>
               <div className="card p-6 flex flex-col gap-2 border-secondary/20">
                 <div className="text-3xl font-bold text-gradient">Adaptive</div>

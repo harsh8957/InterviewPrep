@@ -12,6 +12,7 @@
   "dependencies": {
     "@google-cloud/speech": "^7.1.0",
     "@google-cloud/text-to-speech": "^6.1.0",
+    "@monaco-editor/react": "^4.7.0",
     "@types/react-datepicker": "^6.2.0",
     "classnames": "^2.5.1",
     "clsx": "^2.1.1",

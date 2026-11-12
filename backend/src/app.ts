@@ -12,6 +12,8 @@ import companyRoutes from './server/routes/company';
 import interviewTipsRoutes from './server/routes/interview-tips';
 import resumeRoutes from './server/routes/resume';
 import adminRoutes from './server/routes/admin';
+import roadmapRoutes from './server/routes/roadmaps';
+import problemRoutes from './server/routes/problems';
 
 export const app = express();
 
@@ -35,6 +37,8 @@ app.use('/api/company', companyRoutes);
 app.use('/api/interview-tips', interviewTipsRoutes);
 app.use('/api/resume', resumeRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/roadmaps', roadmapRoutes);
+app.use('/api/problems', problemRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
