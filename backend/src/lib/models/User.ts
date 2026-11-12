@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 export interface IUser extends mongoose.Document {
   email: string;
   password: string;
-  role: 'candidate' | 'hr';
+  role: 'candidate' | 'hr' | 'admin';
   firstName: string;
   lastName: string;
   company?: string;

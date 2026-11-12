@@ -1,6 +1,7 @@
 import express from 'express';
 import { InterviewTip } from '../../lib/models/InterviewTip';
 import { aiService } from '../../services/aiService';
+import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -32,7 +33,7 @@ router.get('/:slug', async (req, res) => {
 });
 
 // AI Interview Coach - Roadmap
-router.post('/coach/roadmap', async (req, res) => {
+router.post('/coach/roadmap', authenticateToken, async (req, res) => {
   try {
     const { company, role, experienceLevel } = req.body;
     
@@ -62,7 +63,7 @@ Do not return any markdown wrapping, just the JSON string.`;
 });
 
 // AI Answer Review
-router.post('/coach/review', async (req, res) => {
+router.post('/coach/review', authenticateToken, async (req, res) => {
   try {
     const { question, answer } = req.body;
     if (!question || !answer) return res.status(400).json({ message: 'Question and answer required' });

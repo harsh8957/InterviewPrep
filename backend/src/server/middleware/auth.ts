@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+import { JWT_SECRET } from '../../lib/jwt';
+import RevokedToken from '../../lib/models/RevokedToken';
 
 export interface AuthRequest extends Request { // Added export
   user?: {
@@ -10,7 +10,7 @@ export interface AuthRequest extends Request { // Added export
   };
 }
 
-export const authenticateToken = (
+export const authenticateToken = async (
   req: AuthRequest,
   res: Response,
   next: NextFunction
@@ -23,6 +23,12 @@ export const authenticateToken = (
   }
 
   try {
+    // Check if token has been revoked
+    const isRevoked = await RevokedToken.exists({ token });
+    if (isRevoked) {
+      return res.status(401).json({ message: 'Token has been revoked' });
+    }
+
     const decoded = jwt.verify(token, JWT_SECRET) as {
       userId: string;
       role: string;

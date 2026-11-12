@@ -4,7 +4,7 @@ import { getRandomId } from '../lib/utils';
 // Define constants for question counts and time limits
 const QUESTION_TIME_LIMIT_SECONDS = 180; // 3 minutes per question
 const DEFAULT_PRACTICE_QUESTION_COUNT = 10; 
-const DEFAULT_SCHEDULED_QUESTION_COUNT = 5; 
+const DEFAULT_SCHEDULED_QUESTION_COUNT = 10; 
 
 // Define the types
 export type JobRole = 'web-developer' | 'app-developer' | 'ml-ai' | 'ux-designer' | 'data-scientist';
@@ -39,6 +39,11 @@ export interface InterviewAnswer {
   strengths?: string[];
   weaknesses?: string[];
   questionText?: string; 
+  isCrossQuestion?: boolean;
+  difficulty?: number;
+  containsCode?: boolean;
+  timeComplexity?: string;
+  spaceComplexity?: string;
 }
 
 export interface InterviewResult {
@@ -197,7 +202,7 @@ interface InterviewContextType {
   startInterview: (options?: InterviewStartOptions) => Promise<void>;
   nextQuestion: () => void;
   previousQuestion: () => void;
-  saveAnswer: (answer: Omit<InterviewAnswer, 'score' | 'feedback' | 'strengths' | 'weaknesses'>) => Promise<void>;
+  saveAnswer: (answer: Omit<InterviewAnswer, 'score' | 'feedback' | 'strengths' | 'weaknesses'>) => Promise<boolean>;
   finishInterview: () => void;
   isInterviewInProgress: boolean;
   isInterviewComplete: boolean;
@@ -205,6 +210,9 @@ interface InterviewContextType {
   isInitializingMedia: boolean;
   retryMediaStream: () => Promise<boolean>;
   isHrScheduledInterview: boolean; 
+  targetQuestionCount: number;
+  mainQuestionCount: number;
+  currentDifficulty: number;
 }
 
 const InterviewContext = createContext<InterviewContextType | undefined>(undefined);
@@ -230,7 +238,26 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [mediaStreamError, setMediaStreamError] = useState<string | null>(null);
   const [isInitializingMedia, setIsInitializingMedia] = useState(false);
   const [isHrScheduledInterview, setIsHrScheduledInterview] = useState(false); 
+  const [targetQuestionCount, setTargetQuestionCount] = useState(10);
+  const [mainQuestionCount, setMainQuestionCount] = useState(0);
+  const [currentDifficulty, setCurrentDifficulty] = useState(5);
   const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+
+  // Save session state for Resume Interview functionality
+  useEffect(() => {
+    if (isInterviewInProgress) {
+      const interviewId = sessionStorage.getItem('currentInterviewId') || 'default';
+      const sessionKey = `interview_session_${interviewId}`;
+      const stateToSave = {
+        questions,
+        answers,
+        mainQuestionCount,
+        currentDifficulty,
+        currentQuestionIndex
+      };
+      localStorage.setItem(sessionKey, JSON.stringify(stateToSave));
+    }
+  }, [questions, answers, mainQuestionCount, currentDifficulty, currentQuestionIndex, isInterviewInProgress]);
 
   const finishInterview = useCallback(async () => {
     if (mediaStream) {
@@ -246,6 +273,10 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     
     if (answers.length > 0 && config) {
       const answersWithScores = answers.filter(answer => answer.score !== undefined);
+      
+      // Clear the local session storage so it doesn't resume a finished interview
+      const interviewId = sessionStorage.getItem('currentInterviewId') || 'default';
+      localStorage.removeItem(`interview_session_${interviewId}`);
       const totalScore = answersWithScores.length > 0
         ? Math.round(answersWithScores.reduce((sum, answer) => sum + (answer.score || 0), 0) / answersWithScores.length)
         : 0;
@@ -360,21 +391,19 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             }))
           };
           
-          fetch(`${API_BASE_URL}/api/interview-results`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify(backendPayload)
-          }).then(response => {
-            if (!response.ok) {
-              response.json().then(errData => {
-                console.error("[InterviewContext] Failed to save interview results to backend. Status:", response.status, "Error:", errData);
-              }).catch(() => {
-                console.error("[InterviewContext] Failed to save interview results to backend. Status:", response.status, "Could not parse error response.");
-              });
+          try {
+            const saveResponse = await fetch(`${API_BASE_URL}/api/interview-results`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+              body: JSON.stringify(backendPayload)
+            });
+            if (!saveResponse.ok) {
+              const errData = await saveResponse.json().catch(() => ({}));
+              console.error("[InterviewContext] Failed to save interview results to backend. Status:", saveResponse.status, "Error:", errData);
             }
-          }).catch(error => {
-            console.error('[InterviewContext] Error during fetch to save interview result to backend:', error);
-          });
+          } catch (error) {
+            console.error('[InterviewContext] Error saving interview result to backend:', error);
+          }
         } else {
           if (!token) console.warn("[InterviewContext] No token, skipping backend save.");
           if (!config) console.warn("[InterviewContext] No config, skipping backend save as jobRole/experienceLevel are missing.");
@@ -421,6 +450,38 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       sessionStorage.removeItem('currentInterviewId'); 
     }
 
+    // Check for saved session
+    const sessionKey = `interview_session_${options?.interviewId || 'default'}`;
+    const savedSession = localStorage.getItem(sessionKey);
+    if (savedSession) {
+      try {
+        const parsed = JSON.parse(savedSession);
+        setQuestions(parsed.questions);
+        setAnswers(parsed.answers);
+        setMainQuestionCount(parsed.mainQuestionCount || 0);
+        setCurrentDifficulty(parsed.currentDifficulty || 5);
+        setCurrentQuestionIndex(parsed.currentQuestionIndex || 0);
+        setIsLoadingQuestions(false);
+        setIsInitializingMedia(false);
+        setIsInterviewInProgress(true);
+        
+        // Still need to fetch media stream
+        if (options?.mediaStream) {
+          setMediaStream(options.mediaStream);
+        } else {
+          navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(stream => setMediaStream(stream))
+            .catch(err => {
+              console.error("[InterviewContext] Error getting media stream on resume:", err);
+              setMediaStreamError(err instanceof Error ? err.message : "Unknown media stream error");
+            });
+        }
+        return; // Skip normal fetching
+      } catch (e) {
+        console.error("Failed to restore session", e);
+      }
+    }
+
     let questionCount = DEFAULT_PRACTICE_QUESTION_COUNT;
 
     if (hrScheduledCheck) { 
@@ -430,6 +491,7 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             questionCount = DEFAULT_SCHEDULED_QUESTION_COUNT;
         }
     }
+    setTargetQuestionCount(questionCount);
     
     let sessionConfig: InterviewConfig | null = null;
     if (options?.jobRole && options?.experienceLevel) {
@@ -529,17 +591,23 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [config, isHrScheduledInterview, API_BASE_URL]); 
   
-  const analyzeAnswer = async (question: string, answer: string, jobRole?: JobRole, experienceLevel?: ExperienceLevel) => {
+  const analyzeAnswer = async (question: string, answer: string, jobRole?: JobRole, _experienceLevel?: ExperienceLevel, history?: InterviewAnswer[]) => {
     try {
+      const formattedHistory = history?.map(a => ({
+        question: a.questionText || '',
+        answer: a.text
+      })) || [];
+
       const requestBody = {
-        question,
-        answer,
+        currentQuestion: question,
+        currentAnswer: answer,
         jobRole: jobRole || config?.jobRole,
-        experienceLevel: experienceLevel || config?.experienceLevel
+        history: formattedHistory,
+        currentDifficulty
       };
 
       const analyzeToken = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/interviews/gemini/analyze`, {
+      const response = await fetch(`${API_BASE_URL}/api/interviews/gemini/evaluate-and-next`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -559,10 +627,14 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch (error) {
       console.error('[InterviewContext] Error in analyzeAnswer:', error);
       const mockAnalysis = {
-        score: Math.floor(Math.random() * 21) + 50, 
-        feedback: "Error analyzing your answer with the AI service. This is fallback feedback.",
+        score: 0, 
+        feedback: "AI evaluation service is temporarily unavailable. Your answer was recorded.",
         strengths: [],
-        weaknesses: ["AI analysis unavailable"]
+        weaknesses: ["AI evaluation unavailable"],
+        nextQuestion: "Could you elaborate on a related technical concept you found challenging?",
+        isCrossQuestion: false,
+        newDifficulty: currentDifficulty,
+        containsCode: false
       };
       return mockAnalysis;
     }
@@ -606,17 +678,20 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  const saveAnswer = async (answerData: Omit<InterviewAnswer, 'score' | 'feedback' | 'strengths' | 'weaknesses'>) => {
+  const saveAnswer = async (answerData: Omit<InterviewAnswer, 'score' | 'feedback' | 'strengths' | 'weaknesses'>): Promise<boolean> => {
     if (!config || !questions[currentQuestionIndex]) {
       console.warn("[InterviewContext] saveAnswer - No config or current question, cannot save/analyze.");
-      return;
+      return false;
     }
     
     try {
       let finalAnswerData: InterviewAnswer;
+      let nextQuestionText: string | undefined;
+      let isCrossQuestion = false;
+
       if (answerData.text && answerData.text.trim().length > 10) { 
         const questionText = questions[currentQuestionIndex].text;
-        const analysis = await analyzeAnswer(questionText, answerData.text, config.jobRole, config.experienceLevel);
+        const analysis = await analyzeAnswer(questionText, answerData.text, config.jobRole, config.experienceLevel, answers);
         
         finalAnswerData = {
           ...answerData,
@@ -624,8 +699,19 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           score: analysis.score, 
           feedback: analysis.feedback,
           strengths: analysis.strengths || [],
-          weaknesses: analysis.weaknesses || []
+          weaknesses: analysis.weaknesses || [],
+          isCrossQuestion: analysis.isCrossQuestion,
+          difficulty: analysis.newDifficulty,
+          containsCode: analysis.containsCode,
+          timeComplexity: analysis.timeComplexity,
+          spaceComplexity: analysis.spaceComplexity
         };
+        nextQuestionText = analysis.nextQuestion;
+        setCurrentDifficulty(analysis.newDifficulty || 5);
+        if (!analysis.isCrossQuestion) {
+          setMainQuestionCount(prev => prev + 1);
+        }
+        isCrossQuestion = !!analysis.isCrossQuestion;
       } else {
         finalAnswerData = {
           ...answerData,
@@ -635,6 +721,7 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           strengths: [],
           weaknesses: []
         };
+        nextQuestionText = "Could you please provide a more detailed response?";
       }
         
       setAnswers(prevAnswers => {
@@ -648,6 +735,18 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
         return updatedAnswers;
       });
+
+      // Dynamically add the next question if we haven't reached the limit of main questions
+      const nextMainCount = isCrossQuestion ? mainQuestionCount : mainQuestionCount + 1;
+      if (nextQuestionText && nextMainCount < targetQuestionCount) {
+        setQuestions(prev => {
+           // Ensure we don't accidentally add the same question if called multiple times rapidly
+           if (prev.length > currentQuestionIndex + 1) return prev;
+           return [...prev, { id: getRandomId(), text: nextQuestionText as string }];
+        });
+        return true;
+      }
+      return false;
     } catch (error) {
       console.error('[InterviewContext] Error in saveAnswer:', error);
       setAnswers(prevAnswers => {
@@ -666,6 +765,7 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           return [...prevAnswers, basicAnswerData as InterviewAnswer];
         }
       });
+      return false;
     }
   };
 
@@ -690,7 +790,10 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         mediaStreamError,
         isInitializingMedia,
         retryMediaStream,
-        isHrScheduledInterview, 
+        isHrScheduledInterview,
+        targetQuestionCount,
+        mainQuestionCount,
+        currentDifficulty
       }}
     >
       {children}

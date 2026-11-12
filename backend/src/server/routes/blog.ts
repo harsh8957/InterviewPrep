@@ -60,7 +60,7 @@ router.get('/:slug', async (req, res) => {
 });
 
 // AI Summarize blog
-router.post('/:id/summarize', async (req, res) => {
+router.post('/:id/summarize', authenticateToken, async (req, res) => {
   try {
     const blog = await BlogPost.findById(req.params.id);
     if (!blog) return res.status(404).json({ message: 'Blog not found' });

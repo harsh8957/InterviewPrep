@@ -1,10 +1,11 @@
 import express from 'express';
-import { authenticateToken, requireAdmin } from '../middleware/auth';
+import { authenticateToken, requireAdmin, AuthRequest } from '../middleware/auth';
 import { BlogPost, BlogCategory } from '../../lib/models/Blog';
 import { FAQ, FAQCategory } from '../../lib/models/FAQ';
 import { Job } from '../../lib/models/Job';
 import { PolicyDocument } from '../../lib/models/PolicyDocument';
 import { CompanyInfo, TeamMember } from '../../lib/models/CompanyInfo';
+import { validateBody, createBlogSchema } from '../../lib/validation';
 
 const router = express.Router();
 
@@ -27,13 +28,24 @@ router.get('/stats', async (req, res) => {
   }
 });
 
-// Generic generic CRUD structure for the admin panel could go here. 
-// For production, we'd have full endpoints for creating/updating/deleting all entities.
-
-// Example: Create Blog
-router.post('/blogs', async (req, res) => {
+// Create Blog with explicitly whitelisted fields
+router.post('/blogs', validateBody(createBlogSchema), async (req: AuthRequest, res) => {
   try {
-    const blog = new BlogPost({ ...req.body, author: req.user!.userId });
+    const { title, slug, content, summary, category, tags, coverImage, status, publishedAt } = req.body;
+    const blog = new BlogPost({
+      title,
+      slug,
+      content,
+      summary,
+      category,
+      tags: tags || [],
+      coverImage,
+      status: status || 'draft',
+      publishedAt: publishedAt || (status === 'published' ? new Date() : undefined),
+      author: req.user!.userId,
+      likes: 0,
+      comments: []
+    });
     await blog.save();
     res.status(201).json(blog);
   } catch (error) {

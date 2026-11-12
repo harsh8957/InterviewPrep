@@ -125,7 +125,7 @@ const LoginPage = () => {
             <div className="form-group">
               <div className="flex items-center justify-between mb-1.5">
                 <label htmlFor="login-password" className="label mb-0">Password</label>
-                <Link to="/forgot-password" className="text-xs text-primary hover:underline font-medium">
+                <Link to="/contact?subject=Password%20Reset%20Assistance" className="text-xs text-primary hover:underline font-medium">
                   Forgot password?
                 </Link>
               </div>

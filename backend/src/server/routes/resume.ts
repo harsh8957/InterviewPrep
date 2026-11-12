@@ -1,6 +1,7 @@
 import express from 'express';
 import { ResumeGuide } from '../../lib/models/ResumeGuide';
 import { aiService } from '../../services/aiService';
+import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ router.get('/:slug', async (req, res) => {
   }
 });
 
-router.post('/analyze', async (req, res) => {
+router.post('/analyze', authenticateToken, async (req, res) => {
   try {
     const { resumeText } = req.body;
     if (!resumeText) return res.status(400).json({ message: 'Resume text is required' });
@@ -51,7 +52,7 @@ Do not return any markdown wrapping, just the JSON string.`;
   }
 });
 
-router.post('/improve-bullet', async (req, res) => {
+router.post('/improve-bullet', authenticateToken, async (req, res) => {
   try {
     const { bulletPoint } = req.body;
     if (!bulletPoint) return res.status(400).json({ message: 'Bullet point is required' });
