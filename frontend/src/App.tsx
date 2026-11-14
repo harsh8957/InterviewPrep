@@ -35,6 +35,7 @@ const AssessmentsPage = lazy(() => import('./pages/AssessmentsPage'));
 const AssessmentWorkspacePage = lazy(() => import('./pages/AssessmentWorkspacePage'));
 const CoreCSPage = lazy(() => import('./pages/CoreCSPage'));
 const SystemDesignPage = lazy(() => import('./pages/SystemDesignPage'));
+const SystemDesignWorkspacePage = lazy(() => import('./pages/SystemDesignWorkspacePage'));
 const CompaniesPage = lazy(() => import('./pages/CompaniesPage'));
 const SetupPage = lazy(() => import('./pages/SetupPage'));
 const InterviewPage = lazy(() => import('./pages/InterviewPage'));
@@ -198,6 +199,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['candidate', 'admin']}>
                     <SystemDesignPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="system-design/:slug"
+                element={
+                  <ProtectedRoute allowedRoles={['candidate', 'admin']}>
+                    <SystemDesignWorkspacePage />
                   </ProtectedRoute>
                 }
               />

@@ -155,9 +155,9 @@ export const AppShell: React.FC<{ children?: React.ReactNode }> = ({ children })
         items: [
           { to: '/roadmap', label: 'DSA Roadmap', icon: Map, badge: 'Phase 3', badgeVariant: 'secondary' },
           { to: '/problems', label: 'Problem Bank', icon: Code2, badge: 'Phase 3', badgeVariant: 'secondary' },
-          { to: '/assessments', label: 'Coding Assessments', icon: FileCode2, badge: 'Phase 4', badgeVariant: 'outline' },
-          { to: '/core-cs', label: 'Core CS Subjects', icon: Cpu, badge: 'Phase 5', badgeVariant: 'outline' },
-          { to: '/system-design', label: 'System Design', icon: Boxes, badge: 'Phase 5', badgeVariant: 'outline' },
+          { to: '/assessments', label: 'Coding Assessments', icon: FileCode2, badge: 'Live', badgeVariant: 'secondary' },
+          { to: '/core-cs', label: 'Core CS Subjects', icon: Cpu, badge: 'Live', badgeVariant: 'secondary' },
+          { to: '/system-design', label: 'System Design', icon: Boxes, badge: 'Live', badgeVariant: 'secondary' },
           { to: '/companies', label: 'Company Guides', icon: Building2, badge: 'Phase 7', badgeVariant: 'outline' },
         ]
       },

@@ -9,7 +9,8 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "create-admin": "tsx src/scripts/createAdmin.ts",
-    "seed:dsa": "tsx src/scripts/seedDSA.ts"
+    "seed:dsa": "tsx src/scripts/seedDSA.ts",
+    "seed:core-cs": "tsx src/scripts/seedCoreCS.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

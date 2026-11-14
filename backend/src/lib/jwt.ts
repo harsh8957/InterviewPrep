@@ -5,3 +5,5 @@ if (process.env.NODE_ENV !== 'test' && !process.env.JWT_SECRET) {
 }
 
 export const JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-only-for-automated-tests';
+
+export const getJwtSecret = (): string => JWT_SECRET;

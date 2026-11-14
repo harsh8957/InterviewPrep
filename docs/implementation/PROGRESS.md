@@ -1,9 +1,9 @@
 # InterviewPrep — Implementation Progress & Tracking
 
-**Repository:** `D:\InterviewPrep\InterviewPrep`  
-**Current Phase:** Phase 3 — DSA Roadmap, Problem Bank & Coding Practice Workspace  
-**Status:** **PHASE 3 FULLY COMPLETED & VERIFIED** (Ready for User Acceptance)  
-**Last Updated:** 2026-11-13
+**Repository:** `D:\InterviewPrep\InterviewPrep`
+**Current Phase:** Phase 5 — Core CS, System Design & Behavioral Preparation
+**Status:** **PHASE 5 FULLY COMPLETED & VERIFIED** (Ready for User Acceptance)
+**Last Updated:** 2026-11-14
 
 ---
 
@@ -15,7 +15,7 @@
 | **Phase 2** | UI/UX Redesign & Responsive Workspace Shell | **COMPLETED** | 2026-11-13 |
 | **Phase 3** | DSA Roadmap, Problem Bank & Coding Practice Workspace | **COMPLETED** | 2026-11-13 |
 | **Phase 4** | Online Coding Judge & Timed Assessments | **COMPLETED** | 2026-11-13 |
-| **Phase 5** | Core CS & System Design Modules | PENDING | — |
+| **Phase 5** | Core CS & System Design Modules | **COMPLETED** | 2026-11-14 |
 | **Phase 6** | Code-Aware & Resume-Driven AI Mock Interviews | PENDING | — |
 | **Phase 7** | Company-Specific Prep Tracks & Experiences | PENDING | — |
 | **Phase 8** | Progress Analytics, Bookmarks & Profiles | PENDING | — |
@@ -115,6 +115,35 @@
    - `AssessmentsPage.tsx`: Live-connected assessment catalog displaying challenge cards, duration, difficulty, problem count, and start/resume actions.
    - `AssessmentWorkspacePage.tsx`: Dedicated assessment environment with server-synchronized countdown timer, multi-problem switcher, Monaco IDE with local storage persistence, test runners, and scorecard modal.
 
+### 2.7 Core CS, System Design & Behavioral Preparation (Phase 5)
+1. **Core CS Architecture & Question Confidentiality:**
+   - Database Models: `CoreCSQuizItem` (subject, topic, slug, title, format, difficulty, conceptExplanation, prompt, options, correctAnswerIndex, explanation, flashcardBack, keyTakeaway, interviewTips) and `ConceptAttempt` (userId, itemId, subject, topic, selectedOption, isCorrect, timeSpentSeconds, attemptCount).
+   - Strict Confidentiality: `GET /api/core-cs/:subject/items` strictly projects away `correctAnswerIndex` and `explanation` before candidate attempt submission.
+   - Server-Side Grading: `POST /api/core-cs/attempts` grades answers server-side, upserts `ConceptAttempt` with incremented attempt count without inflating solved counts, and returns grading result with official explanation and key takeaway.
+   - Mastery Analytics: `GET /api/core-cs/attempts` and `GET /api/core-cs/subjects` aggregate solved counts, attempts, and percentage mastery by subject.
+   - Frontend Multi-Mode Console (`CoreCSPage.tsx`): 4 subject cards (OS, DBMS, CN, OOP) supporting Concept Review mode, Interactive Quiz & Scenario drill with instant grading feedback, and 3D Flashcard Deck mode.
+2. **Interactive System Design Studio:**
+   - Database Models: `SystemDesignCase` (HLD & LLD schemas, capacity estimations, API designs, data models, reference Mermaid topology, tradeoffs, deep-dives, 8-point rubric) and `SystemDesignSubmission` (candidate diagram, notes, rubric self-scores, AI critique).
+   - Sanitized Diagram Processing: Input sanitization strips malicious HTML or script injections from Mermaid syntax.
+   - High-Level Architecture Workspace (`SystemDesignWorkspacePage.tsx`):
+     - Requirements tab (functional/non-functional constraints).
+     - Capacity Math sizing calculator (QPS, storage, bandwidth, RAM cache).
+     - APIs & Data Models tab (endpoints, payload definitions, database storage selection).
+     - Tradeoffs tab (decision matrices, pros/cons, CAP theorem analysis).
+     - Interactive Mermaid Studio: Candidate diagram editor, instant syntax validation via `MermaidViewer.tsx`, and comparison toggle against official reference architecture.
+     - 8-Point Evaluation Rubric: Requirements, data model, architecture, scalability, availability, reliability, security, and tradeoffs with candidate self-scoring sliders (1-5).
+     - Architectural Review: Optional AI critique via centralized gateway with heuristic fallback returning score (0-100), feedback, strengths, and improvements.
+3. **Behavioral Preparation & STAR Story Builder:**
+   - Database Models: `BehavioralQuestion` (prompt, competency, model STAR example, interview tips) and `StarStory` (userId, title, category, situation, task, action, result, metrics, learnings, companyTags, aiReview).
+   - Integrated Strategy Hub (`InterviewTipsPage.tsx`): Unified behavioral preparation with existing Interview Tips and AI Coach without duplication.
+   - STAR Story Studio: Situation, Task, Action ("I" vs "We"), Result, Metrics, and Reflection fields with instant persistence.
+   - Personal Story Bank: Candidate library supporting review, editing, and deletion with IDOR authorization (`403` for non-owners).
+   - Rubric Feedback: `POST /api/behavioral/stories/:id/feedback` evaluating stories against clarity and business impact metrics.
+4. **Curriculum Seeding:**
+   - Seeded 15 comprehensive Core CS items across Operating Systems, DBMS, Computer Networks, and OOP.
+   - Seeded 4 interactive System Design cases: Distributed Rate Limiter (Token Bucket), TinyURL (Snowflake / Base62), Real-Time Chat Engine (WebSockets / Kafka / Cassandra), and E-Commerce Flash Sale (Redis DECR / Saga / Queue).
+   - Seeded 4 behavioral competency questions with model STAR answers.
+
 ---
 
 ## 3. Changed Files Log
@@ -194,6 +223,21 @@
 | `backend/tests/judge.test.ts` | 11 automated unit & integration tests for execution verdicts, confidentiality, and rate limiting. |
 | `backend/tests/assessment.test.ts` | 7 automated tests for assessment attempts, server expiry, and score calculation. |
 | `frontend/src/pages/AssessmentWorkspacePage.tsx` | Timed assessment environment with countdown timer, problem switching, and Monaco IDE. |
+| `backend/src/lib/models/CoreCSQuizItem.ts` | Schema for conceptual curriculum questions, explanations, MCQs, scenarios, and flashcards. |
+| `backend/src/lib/models/ConceptAttempt.ts` | Schema for candidate concept mastery attempts and progress tracking. |
+| `backend/src/lib/models/SystemDesignCase.ts` | Schema for HLD and LLD case studies, capacity math, APIs, data models, Mermaid diagrams, and tradeoffs. |
+| `backend/src/lib/models/SystemDesignSubmission.ts` | Schema for candidate architectural drafts, Mermaid diagrams, notes, and rubric scores. |
+| `backend/src/lib/models/BehavioralPrep.ts` | Schemas for `BehavioralQuestion` bank and candidate `StarStory` records. |
+| `backend/src/server/routes/coreCS.ts` | Endpoints for subject overview, topic curriculum, questions with confidentiality, attempts, and stats. |
+| `backend/src/server/routes/systemDesign.ts` | Endpoints for case catalog, case detail, saving drafts, and architectural reviews. |
+| `backend/src/server/routes/behavioral.ts` | Endpoints for behavioral questions, candidate STAR story CRUD with IDOR protection, and rubric analysis. |
+| `backend/src/scripts/seedCoreCS.ts` | Seed script populating 15 Core CS items, 4 interactive system design cases, and 4 behavioral competency questions. |
+| `backend/tests/coreCS.test.ts` | 19 automated integration tests covering Core CS confidentiality, grading, system design, and STAR stories. |
+| `frontend/src/components/system-design/MermaidViewer.tsx` | Sanitized Mermaid.js architecture topology renderer with instant error boundary. |
+| `frontend/src/pages/CoreCSPage.tsx` | Interactive 4-subject workspace with Study, Quiz & Scenario Drill, and 3D Flashcards Deck modes. |
+| `frontend/src/pages/SystemDesignPage.tsx` | Catalog of distributed architecture cases with HLD/LLD filtering and direct workspace links. |
+| `frontend/src/pages/SystemDesignWorkspacePage.tsx` | Interactive split-screen studio with Requirements, Capacity Math, APIs, Tradeoffs, Rubric sliders, and Mermaid editor. |
+| `frontend/src/pages/InterviewTipsPage.tsx` | Integrated Behavioral Hub with STAR Story Builder, personal story bank, competency bank, and strategy guides. |
 
 ---
 
@@ -202,12 +246,13 @@
 | Suite | Checks Run | Passed | Failed | Key Verification Results |
 | :--- | :--- | :--- | :--- | :--- |
 | **Frontend TypeScript Compile** | `npx tsc --noEmit` | **PASS** | 0 | Exit code 0, zero TypeScript errors across all workspace components and routes. |
-| **Frontend Production Build** | `npm run build` (`vite`) | **PASS** | 0 | Built chunks in 19.18s with clean lazy loading and zero warnings. |
+| **Frontend Production Build** | `npm run build` (`vite`) | **PASS** | 0 | Built 70+ chunks with Mermaid.js integration, clean lazy loading, and zero fatal errors. |
 | **Frontend Lint** | `npm run lint` (`eslint`) | **PASS** | 0 | Exit code 0, 0 errors across all frontend files. |
-| **Backend TypeScript Compile** | `npx tsc --noEmit` | **PASS** | 0 | Exit code 0, zero TypeScript errors across all models and routes. |
-| **Backend Production Build** | `npm run build` (`tsup`) | **PASS** | 0 | `dist/index.js 107.02 KB` built in 1117ms. |
+| **Backend TypeScript Compile** | `npx tsc --noEmit` | **PASS** | 0 | Exit code 0, zero TypeScript errors across all models, routers, and scripts. |
+| **Backend Production Build** | `npm run build` (`tsup`) | **PASS** | 0 | `dist/index.js 148.48 KB` built in 151ms. |
+| **Backend Core CS & System Design** | `vitest run tests/coreCS.test.ts` | **19** | **0** | All 19 Phase 5 automated tests pass (confidentiality, server grading, system design drafts, IDOR story CRUD). |
 | **Backend Judge & Execution Suite** | `vitest run tests/judge.test.ts` | **11** | **0** | All 11 Phase 4 judge tests pass (AC, WA, TLE, CE, RE, confidentiality, rate limiting). |
 | **Backend Assessment Suite** | `vitest run tests/assessment.test.ts` | **7** | **0** | All 7 Phase 4 assessment tests pass (start, resume, late expiry 403, scorecard). |
 | **Backend DSA API Suite** | `vitest run tests/dsa.test.ts` | **13** | **0** | All 13 Phase 3 automated unit & integration tests pass (roadmaps, problem catalog, confidentiality, admin CRUD). |
 | **Backend Security Regression** | `vitest run tests/security.test.ts` | **8** | **0** | All 8 Phase 1 security regression tests continue to pass. |
-| **FastAPI Evaluator Suite** | `test_evaluator.py` | **8** | **0** | All 8 evaluator regression tests pass. |
+| **Total Backend Test Coverage** | `vitest run` (all 5 suites) | **58** | **0** | **58 passing tests, 0 failures, 0 regressions.** |

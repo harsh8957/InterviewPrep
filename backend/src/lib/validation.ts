@@ -139,3 +139,51 @@ export const createAssessmentSchema = z.object({
 });
 
 export const updateAssessmentSchema = createAssessmentSchema.partial();
+
+// Core CS Concept Attempt Schema
+export const createConceptAttemptSchema = z.object({
+  itemId: z.string().min(1, 'Item ID is required'),
+  selectedOption: z.number().int().min(0, 'Selected option must be a non-negative integer'),
+  timeSpentSeconds: z.number().min(0).optional().default(0),
+});
+
+// System Design Submission Schema
+export const saveSystemDesignSubmissionSchema = z.object({
+  mermaidDiagram: z.string().max(20000, 'Diagram cannot exceed 20,000 characters').optional().default(''),
+  notes: z.string().max(50000, 'Notes cannot exceed 50,000 characters').optional().default(''),
+  rubricSelfScore: z
+    .object({
+      requirements: z.number().int().min(1).max(5).default(3),
+      dataModel: z.number().int().min(1).max(5).default(3),
+      architecture: z.number().int().min(1).max(5).default(3),
+      scalability: z.number().int().min(1).max(5).default(3),
+      reliability: z.number().int().min(1).max(5).default(3),
+      security: z.number().int().min(1).max(5).default(3),
+      tradeoffs: z.number().int().min(1).max(5).default(3),
+    })
+    .optional(),
+});
+
+// Behavioral STAR Story Schemas
+export const createStarStorySchema = z.object({
+  title: z.string().min(1, 'Title is required').max(150, 'Title cannot exceed 150 characters'),
+  category: z.enum([
+    'leadership',
+    'conflict',
+    'failure',
+    'teamwork',
+    'problem-solving',
+    'adaptability',
+    'general',
+  ]).optional().default('general'),
+  questionId: z.string().optional(),
+  situation: z.string().min(10, 'Situation requires at least 10 characters').max(3000),
+  task: z.string().min(10, 'Task requires at least 10 characters').max(3000),
+  action: z.string().min(15, 'Action requires at least 15 characters').max(5000),
+  result: z.string().min(10, 'Result requires at least 10 characters').max(3000),
+  metrics: z.string().max(1000).optional().default(''),
+  learnings: z.string().max(2000).optional().default(''),
+  companyTags: z.array(z.string()).optional().default([]),
+});
+
+export const updateStarStorySchema = createStarStorySchema.partial();

@@ -16,6 +16,9 @@ import roadmapRoutes from './server/routes/roadmaps';
 import problemRoutes from './server/routes/problems';
 import submissionRoutes from './server/routes/submissions';
 import assessmentRoutes from './server/routes/assessments';
+import coreCSRoutes from './server/routes/coreCS';
+import systemDesignRoutes from './server/routes/systemDesign';
+import behavioralRoutes from './server/routes/behavioral';
 
 export const app = express();
 
@@ -43,6 +46,9 @@ app.use('/api/roadmaps', roadmapRoutes);
 app.use('/api/problems', problemRoutes);
 app.use('/api/submissions', submissionRoutes);
 app.use('/api/assessments', assessmentRoutes);
+app.use('/api/core-cs', coreCSRoutes);
+app.use('/api/system-design', systemDesignRoutes);
+app.use('/api/behavioral', behavioralRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
