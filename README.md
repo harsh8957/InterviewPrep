@@ -1,183 +1,184 @@
-# 🚀 InterviewPrep — AI-Powered Mock Interview Platform
+# 🚀 InterviewPrep — Production-Grade Developer Workspace & AI Interview Platform
 
-**InterviewPrep** is an advanced, full-stack AI-driven mock interview application designed to help job seekers practice technical, role-specific, and behavioral interviews. It leverages large language models (Google Gemini AI) to generate dynamic, contextual questions and provides real-time scoring, analytical insights, and constructive feedback on candidate answers.
+[![CI/CD Pipeline](https://github.com/harsh8957/InterviewPrep/actions/workflows/ci.yml/badge.svg)](https://github.com/harsh8957/InterviewPrep/actions/workflows/ci.yml)
+[![Node.js](https://img.shields.io/badge/Node.js-v20-339933?logo=node.js)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-v18-61DAFB?logo=react)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-v5-3178C6?logo=typescript)](https://www.typescriptlang.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-v0.110-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?logo=docker)](https://www.docker.com/)
 
-The platform is designed with two distinct workflows:
-- **For Candidates**: Practice interview sessions, record verbal responses, receive instant AI evaluations, and track skill improvement on a personal dashboard.
-- **For HR / Recruiters**: Configure customized interview rooms for various job roles, manage candidates, schedule evaluations, and review comprehensive assessment scorecards.
-
----
-
-## 🛠️ Tech Stack & Key Technologies
-
-| Layer | Technologies & Libraries |
-| :--- | :--- |
-| **Frontend** | React 18, Vite, TypeScript, TailwindCSS v3, HTML5 Speech Recognition API |
-| **Backend API** | Node.js, Express, TypeScript, Mongoose (MongoDB ODM), JWT (JSON Web Tokens) |
-| **AI Evaluation** | Python, FastAPI, Google Gemini API (`gemini-2.0-flash`), Pydantic |
-| **State & Styling** | React Context (Auth, Theme, HR, Interview), Lucide React, Tailwind Theme Variables |
+**InterviewPrep** is an enterprise-grade technical interview preparation platform and developer workspace. It combines algorithmic coding practice, timed assessments, core computer science modules, interactive system design case studies, code-aware AI mock interviews, company hiring tracks, spaced-repetition revision, and verified developer showcases into a unified full-stack application.
 
 ---
 
-## 🏗️ System Architecture & Workflow
-
-The platform follows a microservices-inspired architecture where the frontend coordinates with the Express gateway, and heavy AI completions are offloaded to a specialized Python FastAPI service.
+## 🏗️ System Architecture
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    actor Candidate as Candidate
-    participant FE as React Frontend
-    participant BE as Express API Gateway
-    participant DB as MongoDB Database
-    participant AI as Python FastAPI Service (Gemini)
+flowchart TD
+    subgraph Clients ["Client Layer"]
+        Browser["Modern Browser (Desktop & Mobile)<br/>React 18 • Monaco Code Editor • Audio Speech"]
+    end
 
-    Candidate->>FE: Starts Mock Interview Room
-    FE->>BE: Request Interview Questions for [Role]
-    BE->>AI: Trigger /fetch-questions { role, num_questions }
-    AI-->>BE: Returns generated question list
-    BE-->>FE: Transmits questions to Candidate UI
-    Candidate->>FE: Records Speech/Text answer
-    FE->>BE: Submit Answer for Evaluation
-    BE->>AI: Trigger /evaluate-answer { question, answer, role }
-    Note over AI: AI scores (0.0-1.0) &<br/>generates constructive feedback
-    AI-->>BE: Returns Score + Detailed Feedback
-    BE->>DB: Save Interview Session & Scorecard
-    BE-->>FE: Return Evaluation results instantly
-    FE->>Candidate: Display Dashboard metrics & feedback
+    subgraph Edge ["Edge Ingress & Reverse Proxy"]
+        Nginx["Nginx Reverse Proxy (Port 80/443)<br/>SPA Static Routing • Gzip • HTTP Security Headers"]
+    end
+
+    subgraph AppNetwork ["Internal Docker Network (backend-net)"]
+        Backend["Express API Gateway (Node.js 20)<br/>Helmet • Rate Limiting • Correlation IDs • RBAC"]
+        Evaluator["AI Evaluator Microservice (FastAPI 3.11)<br/>Async SDK • Threadpool Offloading • 30s Timeout"]
+        MongoDB[("MongoDB 7.0 Database<br/>Connection Pooling • Zero Public Port Exposure")]
+    end
+
+    subgraph JudgeHost ["Dedicated Execution Host"]
+        Judge0["Judge0 CE Isolated Sandbox<br/>cgroups v2 • Ephemeral Tmpfs • Network: none"]
+    end
+
+    subgraph ExternalServices ["External Cloud Services"]
+        Gemini["Google Gemini AI API (REST)"]
+    end
+
+    Browser -->|HTTPS / WSS| Nginx
+    Nginx -->|/assets/| Nginx
+    Nginx -->|/api/*| Backend
+    Backend -->|Mongoose Pool (50 max)| MongoDB
+    Backend -->|x-internal-service-key| Evaluator
+    Backend -->|REST / RapidAPI| Judge0
+    Evaluator -->|REST Transport| Gemini
 ```
 
 ---
 
-## 📂 Repository Directory Structure
+## 🌟 Core Modules & Platform Capabilities
 
-```
-InterviewPrep/
-├── frontend/                # React (Vite + TypeScript) SPA
-│   ├── src/
-│   │   ├── components/     # UI elements (Candidate & HR dashboards, layouts)
-│   │   │   └── Interview/  # Recorder, Progress bar, question navigation UI
-│   │   ├── contexts/       # AuthContext, HRContext, InterviewContext, ThemeContext
-│   │   ├── pages/          # 22 pages (Homepage, InterviewRoom, Login, FAQ, Tips, etc.)
-│   │   ├── lib/            # Utilities, Tailwind wrappers, shared interfaces
-│   │   └── main.tsx        # Application mount point
-│   ├── vite.config.ts      # Vite configuration
-│   └── tailwind.config.js  # Color palette and micro-animation configuration
-│
-├── backend/                # Node.js + Express API Gateway
-│   ├── src/
-│   │   ├── lib/            # MongoDB connection (db.ts) and Mongoose models
-│   │   │   └── models/     # 11 Schemas (User, Job, Blog, InterviewRoom, etc.)
-│   │   ├── server/         # Express server middlewares & routes (12 route endpoints)
-│   │   │   └── routes/     # Auth, Admin, Blog, FAQ, Jobs, Interviews, Results routes
-│   │   └── index.ts        # Server listener and socket setup
-│   └── tsconfig.json       # TypeScript build configuration
-│
-└── evaluator_service/      # Python FastAPI microservice
-    ├── main.py             # FastAPI router & Gemini AI client integration
-    ├── requirements.txt    # Python dependencies (fastapi, google-generativeai, etc.)
-    └── .env.example        # Environment blueprint for API keys
-```
+### 1. DSA Roadmap & Monaco Coding Workspace
+- **16 Curriculum Nodes:** Structured progression covering Arrays, Two Pointers, Sliding Window, Trees, Graphs, Dynamic Programming, and Tries.
+- **Problem Bank:** LeetCode-style problem catalog with difficulty filtering, topic badges, and complexity bounds.
+- **Monaco Code Editor:** Split-screen developer workspace with multi-language starter templates (Python 3, JavaScript, TypeScript, C++ 20, Java 21), dark/light themes, and local draft autosave.
 
----
+### 2. Secure Online Coding Judge & Timed Assessments
+- **Judge0 CE Integration:** Untrusted candidate source code runs in hardened Linux execution sandboxes with memory quotas, CPU limits, and no network access.
+- **Confidentiality Safeguards:** Public test cases preview in the editor; evaluation test cases remain strictly confidential on the backend.
+- **HackerRank-Style Assessments:** Timed rounds with countdown clocks, late submission rejections, and automated scorecards.
 
-## 🚦 Detailed API Endpoints
+### 3. Core CS & Interactive System Design Lab
+- **4 Foundation Subjects:** Operating Systems, Database Management Systems, Computer Networks, and Object-Oriented Programming.
+- **Graded Quizzes & Flashcards:** Concept explanations, scenario questions, and server-graded evaluations.
+- **System Design Studio:** Architecture walkthroughs (Rate Limiters, URL Shorteners, Distributed Caches, Chat Engines) with interactive Mermaid/Cytoscape diagrams and trade-off rubrics.
 
-### 1. Express Backend Gateway (`PORT 5000`)
-- **Auth Service**
-  - `POST /api/auth/register` — Registers a new Candidate or HR account.
-  - `POST /api/auth/login` — Authenticates user credentials and issues a JWT token.
-  - `GET /api/auth/me` — Fetches current authenticated user data.
-- **Job Board & Careers**
-  - `GET /api/jobs` — Retrieves list of job openings.
-  - `POST /api/jobs` — (HR only) Publishes a new job role.
-- **Interviews & Rooms**
-  - `GET /api/interviews` — Fetches candidate's scheduled or active interview sessions.
-  - `POST /api/interviews` — Creates or initiates a mock interview room session.
-- **Results & Evaluation**
-  - `POST /api/results/evaluate` — Coordinates with the evaluator service to analyze and save responses.
-  - `GET /api/results/:id` — Retreives details score and feedback for a finished interview.
+### 4. Code-Aware & Resume-Driven AI Mock Interviews
+- **7 Specialized Modes:** DSA Coding, Backend, Full-Stack, System Design, Core CS, Resume Deep-Dive, and Behavioral.
+- **Speech Audio & Verbal Interaction:** Real-time speech-to-text recording, audio playback, and split-screen Monaco coding panel.
+- **Dynamic Adaptive Questioning:** Cross-questions candidates based on their previous answers and evaluates complexity.
+- **Secure PDF Resume Upload:** Strict MIME validation, magic-byte inspection, prompt injection sanitization, and PII isolation.
 
-### 2. Python FastAPI Evaluator Service (`PORT 8001`)
-- `GET /health` — Verifies server health status and validates Gemini API key availability.
-- `POST /fetch-questions` — Generates a customized list of interview questions.
-  - *Payload*: `{ "role": "Frontend Engineer", "num_questions": 5 }`
-- `POST /evaluate-answer` — Grades a candidate's response.
-  - *Payload*: `{ "question": "Explain closures in JS", "answer": "...", "role": "Frontend" }`
-  - *Response*: `{ "score": 0.85, "feedback": "Constructive suggestions here..." }`
+### 5. Company Tracks & Community Interview Loops
+- **FAANG & Tech Tracks:** Dedicated preparation hubs for Google, Amazon, Meta, Microsoft, Uber, and Stripe.
+- **Community Loops & Moderation:** Candidates submit interview debriefs with automated PII detection (phones, emails, interviewer names) and an admin review console.
+
+### 6. Progress Analytics, Bookmarks & Developer Profiles
+- **Idempotent Analytics:** Unique solved counts aggregated strictly from database events; repeated attempts never double-count.
+- **Timezone-Aware Study Streak:** Accurate calendar-day streak tracking calculated in the candidate's preferred timezone.
+- **52-Week Activity Heatmap:** GitHub-style yearly contribution graph.
+- **Spaced Repetition (SuperMemo SM-2):** Bookmarking system scheduling challenging questions at scientifically spaced intervals (Again, Good, Easy ratings).
+- **Public Developer Showcase (`/u/:username`):** Verifiable public profile highlighting solved challenges, streak, top mastered topics, and skills without leaking private credentials.
 
 ---
 
-## 🎨 UI Design System & Micro-Animations
+## 🛡️ Security & Production Hardening
 
-The user interface implements a premium, modern design with an elegant developer aesthetic:
-- **Glassmorphism Layouts**: Frosted glass panels (`backdrop-blur-md`) with gradient borders.
-- **Theme Adaptability**: Synchronized system-preference tracking for dark and light modes.
-- **Interactive States**: Smooth hover scaling, card shimmer effects, and pulsing recording rings to indicate microphone activity.
-- **Accessible Typography**: Styled using clean Inter and Outfit typography settings via Google Fonts.
+| Control | Implementation Details |
+| :--- | :--- |
+| **HTTP Security Headers** | Helmet enforces `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy`. |
+| **Rate Limiting** | Tiered rate limiters: General API (300/15min), Auth (30/15min), Code Execution (60/15min), AI Operations (40/15min). |
+| **Payload Limiting** | Strict 1MB JSON and URL-encoded body size limits to prevent memory exhaustion DoS. |
+| **NoSQL Query Sanitization** | Strips dangerous MongoDB operator keys (`$where`, `$gt`, etc.) from client input bodies and queries. |
+| **JWT Revocation** | Revoked tokens stored in MongoDB with automatic TTL expiry indexes. Explicit token validation on every authenticated request. |
+| **Request Correlation** | Unique `X-Correlation-ID` generated or propagated across all requests for end-to-end distributed tracing. |
+| **Non-Blocking AI Pipeline** | Python FastAPI offloads all synchronous Gemini operations to an asynchronous threadpool with a 30s timeout. |
+| **Network Isolation** | MongoDB and the AI evaluator run on an internal Docker bridge network (`backend-net`) with zero public host port mappings. |
 
 ---
 
-## 🚀 Local Setup & Configuration
+## 🚀 Quickstart & Local Development
 
 ### Prerequisites
-- Node.js (version 18 or higher)
-- Python (version 3.10 or higher)
-- MongoDB running locally or a MongoDB Atlas URI
-- A Google Gemini API Key
+- Node.js 20+
+- Python 3.11+
+- MongoDB 7.0+
 
----
-
-### Step 1: Clone and Prepare Environment Variables
-
-1. Create a `.env` in the `backend/` directory:
-   ```env
-   PORT=5000
-   MONGODB_URI=mongodb://localhost:27017/interviewprep
-   JWT_SECRET=your_super_secret_jwt_token_key
-   EVALUATOR_SERVICE_URL=http://localhost:8001
-   ```
-
-2. Create a `.env` in the `evaluator_service/` directory:
-   ```env
-   GEMINI_API_KEY=AIzaSyYourGeminiApiKeyHere
-   ```
-
----
-
-### Step 2: Running the Services
-
-#### A. Run the Backend API Gateway
+### Local Setup
 ```bash
+# 1. Clone repository
+git clone https://github.com/harsh8957/InterviewPrep.git
+cd InterviewPrep
+
+# 2. Configure environment
+cp .env.example backend/.env
+cp .env.example evaluator_service/.env
+
+# 3. Install dependencies & run backend
 cd backend
+npm install --legacy-peer-deps
+npm run dev
+
+# 4. In a second terminal, run frontend
+cd ../frontend
 npm install
 npm run dev
-```
-The gateway will run at `http://localhost:5000`.
 
-#### B. Run the FastAPI Evaluator Service
-```bash
-cd evaluator_service
-# Set up a virtual environment (optional but recommended)
-python -m venv venv
-venv\Scripts\activate      # On Windows (cmd)
-source venv/bin/activate   # On Linux/macOS
-
+# 5. In a third terminal, run AI evaluator
+cd ../evaluator_service
 pip install -r requirements.txt
 python main.py
 ```
-The evaluator service will run at `http://localhost:8001`.
-
-#### C. Run the React Frontend
-```bash
-cd frontend
-npm install
-npm run dev
-```
-Open your browser and navigate to `http://localhost:5173`.
 
 ---
 
-## 📄 License
+## 🐳 Docker Production Deployment
 
-This repository is licensed under the **MIT License**. Feel free to use it for educational purposes or as a foundation for building remote technical interview tools.
+InterviewPrep includes production Docker orchestration:
+
+```bash
+# 1. Clone and prepare configuration
+git clone https://github.com/harsh8957/InterviewPrep.git /opt/interviewprep
+cd /opt/interviewprep
+cp .env.production.example .env.production
+
+# 2. Start full-stack cluster
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+# 3. Seed curriculum and tracks
+docker compose exec backend npm run seed:dsa
+docker compose exec backend npm run seed:core-cs
+docker compose exec backend npm run seed:companies
+
+# 4. Provision admin account
+docker compose exec -it backend npm run create-admin
+```
+
+See [deploy/JUDGE_DEPLOYMENT.md](file:///d:/InterviewPrep/InterviewPrep/deploy/JUDGE_DEPLOYMENT.md) and [docs/DEPLOYMENT.md](file:///d:/InterviewPrep/InterviewPrep/docs/DEPLOYMENT.md) for full Linux deployment and backup instructions.
+
+---
+
+## 🧪 Testing & Quality Assurance
+
+```bash
+# Backend TypeScript & Lint
+npm --prefix backend run lint
+
+# Backend Production Build
+npm --prefix backend run build
+
+# Frontend TypeScript & ESLint
+npm --prefix frontend run lint
+
+# Frontend Production Bundle Build
+npm --prefix frontend run build
+```
+
+---
+
+## 📄 License & Attribution
+
+InterviewPrep is licensed under the [MIT License](LICENSE).
+Built with modern software engineering practices, verifiable metrics, and strict security boundaries.

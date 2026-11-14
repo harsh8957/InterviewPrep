@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import AppShell from './components/workspace/AppShell';
 import { InterviewProvider } from './contexts/InterviewContext';
 import { HRProvider } from './contexts/HRContext';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Public pages (lazy loaded)
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -106,8 +107,9 @@ const App: React.FC = () => {
   return (
     <HRProvider>
       <InterviewProvider>
-        <Suspense fallback={<PageLoadingFallback />}>
-          <Routes>
+        <ErrorBoundary>
+          <Suspense fallback={<PageLoadingFallback />}>
+            <Routes>
             {/* Public Layout Routes (Marketing Header & Footer) */}
             <Route path="/" element={<Layout />}>
               <Route index element={<HomePage />} />
@@ -337,8 +339,9 @@ const App: React.FC = () => {
             </Route>
           </Routes>
         </Suspense>
-      </InterviewProvider>
-    </HRProvider>
+      </ErrorBoundary>
+    </InterviewProvider>
+  </HRProvider>
   );
 };
 

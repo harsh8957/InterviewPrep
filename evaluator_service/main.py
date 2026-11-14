@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import asyncio
 from typing import List, Optional, Any, Dict
 from fastapi import FastAPI, HTTPException, Header, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +15,7 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
 INTERNAL_SERVICE_KEY = os.getenv("INTERNAL_SERVICE_KEY")
+AI_TIMEOUT_SECONDS = float(os.getenv("AI_TIMEOUT_SECONDS", "30.0"))
 
 if not GEMINI_API_KEY:
     print("WARNING: GEMINI_API_KEY not found. AI features will be unavailable.")
@@ -121,6 +123,31 @@ def clean_json_text(raw_text: str) -> str:
     return cleaned.strip()
 
 
+async def execute_ai_prompt(prompt: str) -> str:
+    """
+    Executes Gemini model generation safely offloaded to a thread pool with a strict timeout.
+    Prevents blocking FastAPI's asynchronous event loop during long-running AI inference.
+    """
+    model = genai.GenerativeModel(GEMINI_MODEL)
+    try:
+        response = await asyncio.wait_for(
+            asyncio.to_thread(model.generate_content, prompt),
+            timeout=AI_TIMEOUT_SECONDS
+        )
+        if not response or not response.text:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Empty response received from AI model."
+            )
+        return response.text
+    except asyncio.TimeoutError:
+        print(f"[EvaluatorService] AI call timed out after {AI_TIMEOUT_SECONDS}s")
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=f"AI model call timed out after {AI_TIMEOUT_SECONDS} seconds."
+        )
+
+
 @app.get("/health")
 def health_check():
     return {
@@ -131,11 +158,21 @@ def health_check():
     }
 
 
+@app.get("/ready")
+def readiness_check():
+    """Readiness probe verifying configuration."""
+    if not GEMINI_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Gemini API key unconfigured"
+        )
+    return {"ready": True, "model": GEMINI_MODEL}
+
+
 @app.post("/fetch-questions", response_model=List[Question], dependencies=[Depends(verify_internal_key)])
 async def fetch_questions(request: QuestionRequest):
     """
-    Fetches role-based interview questions using Gemini AI.
-    Preserves requested question count and experience level.
+    Fetches role-based interview questions using Gemini AI without blocking the event loop.
     """
     if not GEMINI_API_KEY:
         raise HTTPException(
@@ -144,22 +181,16 @@ async def fetch_questions(request: QuestionRequest):
         )
 
     try:
-        model = genai.GenerativeModel(GEMINI_MODEL)
         prompt = (
             f"You are an expert technical interviewer. Generate exactly {request.num_questions} "
             f"distinct technical interview questions for a '{request.role}' role at {request.experience_level} level. "
             f"Questions should be clear, practical, and assess real-world knowledge. "
             f"Return ONLY the questions, one per line, with no numbering, bullets, or commentary."
         )
-        response = model.generate_content(prompt)
-        if not response or not response.text:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Empty response received from AI model."
-            )
+        raw_text = await execute_ai_prompt(prompt)
 
         raw_lines = [
-            line.strip() for line in response.text.strip().split("\n")
+            line.strip() for line in raw_text.strip().split("\n")
             if line.strip() and not line.strip().startswith("#")
         ]
 
@@ -195,8 +226,7 @@ async def fetch_questions(request: QuestionRequest):
 @app.post("/evaluate-answer", response_model=EvaluationResult, dependencies=[Depends(verify_internal_key)])
 async def evaluate_answer(request: AnswerEvaluationRequest):
     """
-    Evaluates a candidate's answer using Gemini AI.
-    Returns a score (0.0-1.0) and constructive feedback without silent fabricated defaults.
+    Evaluates a candidate's answer using Gemini AI asynchronously.
     """
     if not GEMINI_API_KEY:
         raise HTTPException(
@@ -212,7 +242,6 @@ async def evaluate_answer(request: AnswerEvaluationRequest):
         )
 
     try:
-        model = genai.GenerativeModel(GEMINI_MODEL)
         prompt = f"""You are an expert technical interviewer evaluating a candidate's response.
 
 Role: {request.role}
@@ -227,8 +256,8 @@ Return ONLY a valid JSON object with the following schema:
   "feedback": "<2-3 sentences of constructive feedback explaining the score>"
 }}"""
 
-        response = model.generate_content(prompt)
-        cleaned = clean_json_text(response.text)
+        raw_text = await execute_ai_prompt(prompt)
+        cleaned = clean_json_text(raw_text)
         data = json.loads(cleaned)
 
         raw_score = float(data.get("score", 0.0))
@@ -243,7 +272,6 @@ Return ONLY a valid JSON object with the following schema:
         print(f"[EvaluatorService] JSON parse error in evaluate_answer: {jde}")
         # Parse fallback from line format if JSON decode fails
         try:
-            raw_text = response.text.strip()
             score_match = re.search(r"score\s*[:=]\s*([0-1]?\.\d+)", raw_text, re.IGNORECASE)
             feedback_match = re.search(r"feedback\s*[:=]\s*(.*)", raw_text, re.IGNORECASE | re.DOTALL)
             if score_match:
@@ -267,7 +295,7 @@ Return ONLY a valid JSON object with the following schema:
 @app.post("/evaluate-and-next", response_model=EvaluateAndNextResponse, dependencies=[Depends(verify_internal_key)])
 async def evaluate_and_next(request: EvaluateAndNextRequest):
     """
-    Evaluates candidate's answer and generates next adaptive question dynamically.
+    Evaluates candidate's answer and generates next adaptive question dynamically in non-blocking thread.
     """
     if not GEMINI_API_KEY:
         raise HTTPException(
@@ -295,7 +323,6 @@ async def evaluate_and_next(request: EvaluateAndNextRequest):
             history_text += f"Q{i+1}: {item.question}\nA{i+1}: {item.answer}\n\n"
 
     try:
-        model = genai.GenerativeModel(GEMINI_MODEL)
         prompt = f"""You are an expert technical interviewer evaluating a candidate for a '{request.role}' role at {request.experience_level} level.
 
 {history_text}
@@ -323,8 +350,8 @@ Return ONLY a valid JSON object with the following schema:
   "space_complexity": <string or null>
 }}"""
 
-        response = model.generate_content(prompt)
-        cleaned = clean_json_text(response.text)
+        raw_text = await execute_ai_prompt(prompt)
+        cleaned = clean_json_text(raw_text)
         data = json.loads(cleaned)
 
         raw_score = float(data.get("score", 0.0))
@@ -367,7 +394,7 @@ Return ONLY a valid JSON object with the following schema:
 @app.post("/generate-text", response_model=GenerateTextResponse, dependencies=[Depends(verify_internal_key)])
 async def generate_text(request: GenerateTextRequest):
     """
-    Central AI text generation endpoint for general tasks (FAQ, summaries).
+    Central AI text generation endpoint for general tasks (FAQ, summaries) with non-blocking execution.
     """
     if not GEMINI_API_KEY:
         raise HTTPException(
@@ -376,14 +403,8 @@ async def generate_text(request: GenerateTextRequest):
         )
 
     try:
-        model = genai.GenerativeModel(GEMINI_MODEL)
-        response = model.generate_content(request.prompt)
-        if not response or not response.text:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Empty response received from AI model."
-            )
-        return GenerateTextResponse(text=response.text.strip())
+        raw_text = await execute_ai_prompt(request.prompt)
+        return GenerateTextResponse(text=raw_text.strip())
     except HTTPException:
         raise
     except Exception as e:
@@ -397,7 +418,7 @@ async def generate_text(request: GenerateTextRequest):
 @app.post("/generate-json", dependencies=[Depends(verify_internal_key)])
 async def generate_json(request: GenerateJsonRequest):
     """
-    Central AI JSON generation endpoint for structured tasks (Roadmap, Resume Analysis, Reviews).
+    Central AI JSON generation endpoint for structured tasks (Roadmap, Resume Analysis, Reviews) with non-blocking execution.
     """
     if not GEMINI_API_KEY:
         raise HTTPException(
@@ -406,9 +427,8 @@ async def generate_json(request: GenerateJsonRequest):
         )
 
     try:
-        model = genai.GenerativeModel(GEMINI_MODEL)
-        response = model.generate_content(request.prompt)
-        cleaned = clean_json_text(response.text)
+        raw_text = await execute_ai_prompt(request.prompt)
+        cleaned = clean_json_text(raw_text)
         return json.loads(cleaned)
     except HTTPException:
         raise

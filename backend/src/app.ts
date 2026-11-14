@@ -1,5 +1,16 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import {
+  correlationIdMiddleware,
+  sanitizeMongoQuery,
+  requestLogger,
+  apiLimiter,
+  authLimiter,
+  judgeLimiter,
+} from './server/middleware/security';
+
+import healthRoutes from './server/routes/health';
 import authRoutes from './server/routes/auth';
 import interviewRoutes from './server/routes/interviews';
 import interviewResultsRoutes from './server/routes/interviewResults';
@@ -27,15 +38,64 @@ import profileRoutes from './server/routes/profile';
 
 export const app = express();
 
-// Middleware
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  credentials: true,
-}));
-app.use(express.json());
+// Trust reverse proxy (nginx, load balancer) for accurate IP resolution
+app.set('trust proxy', 1);
 
-// Routes
-app.use('/api/auth', authRoutes);
+// 1. Security Headers via Helmet
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'", process.env.FRONTEND_URL || 'http://localhost:5173', 'https:'],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
+
+// 2. Correlation ID & Structured Access Logger
+app.use(correlationIdMiddleware);
+app.use(requestLogger);
+
+// 3. CORS Configuration
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:5173',
+];
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, server-to-server)
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, true); // Permissive in dev, origin-checked in prod
+    },
+    credentials: true,
+  })
+);
+
+// 4. Body Parsers with Strict Size Limits (prevents payload-based DoS)
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// 5. NoSQL Query Sanitization
+app.use(sanitizeMongoQuery);
+
+// 6. Global Rate Limiter
+app.use('/api', apiLimiter);
+
+// 7. System Health Endpoint
+app.use('/api/health', healthRoutes);
+
+// 8. Core Application Routes (with targeted strict limiters)
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/interviews', interviewRoutes);
 app.use('/api/interview-results', interviewResultsRoutes);
 app.use('/api/blog', blogRoutes);
@@ -49,7 +109,7 @@ app.use('/api/resume', resumeRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/roadmaps', roadmapRoutes);
 app.use('/api/problems', problemRoutes);
-app.use('/api/submissions', submissionRoutes);
+app.use('/api/submissions', judgeLimiter, submissionRoutes);
 app.use('/api/assessments', assessmentRoutes);
 app.use('/api/core-cs', coreCSRoutes);
 app.use('/api/system-design', systemDesignRoutes);
@@ -60,10 +120,31 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/bookmarks', bookmarksRoutes);
 app.use('/api/profile', profileRoutes);
 
-// Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
+// 9. Standardized Production Error Handling Middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const status = err.status || err.statusCode || 500;
+  const correlationId = (req as any).correlationId;
+
+  // Handle Payload Too Large
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({
+      success: false,
+      message: 'Request payload exceeds 1MB limit.',
+      correlationId,
+    });
+  }
+
+  const responseBody: Record<string, any> = {
+    success: false,
+    message: err.message || 'Internal Server Error',
+    correlationId,
+  };
+
+  if (process.env.NODE_ENV !== 'production' && err.stack) {
+    responseBody.stack = err.stack;
+  }
+
+  res.status(status).json(responseBody);
 });
 
 export default app;

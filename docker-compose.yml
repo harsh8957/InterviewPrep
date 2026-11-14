@@ -1,0 +1,96 @@
+services:
+  # MongoDB Database Service (Isolated on backend network, zero public port exposure)
+  mongo:
+    image: mongo:7.0-jammy
+    container_name: interviewprep-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: echoprep_prod
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - backend-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Python AI Evaluator Microservice (Internal only)
+  evaluator:
+    build:
+      context: ./evaluator_service
+      dockerfile: Dockerfile
+    container_name: interviewprep-evaluator
+    restart: unless-stopped
+    env_file:
+      - ./evaluator_service/.env
+    networks:
+      - backend-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # Node.js Express Backend Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: interviewprep-backend
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      evaluator:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGODB_URI: mongodb://mongo:27017/echoprep_prod
+      EVALUATOR_SERVICE_URL: http://evaluator:8001
+      FRONTEND_URL: http://localhost:8080
+    env_file:
+      - ./backend/.env
+    networks:
+      - backend-net
+      - frontend-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # Nginx Frontend Static + Reverse Proxy Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: interviewprep-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    networks:
+      - frontend-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+networks:
+  # Isolated internal network for database and AI microservice
+  backend-net:
+    driver: bridge
+    internal: true
+  # Frontend-facing network for reverse proxy and API communication
+  frontend-net:
+    driver: bridge
+
+volumes:
+  mongo-data:
+    driver: local
