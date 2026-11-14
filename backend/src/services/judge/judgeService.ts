@@ -70,6 +70,19 @@ export class JudgeService {
   }
 
   /**
+   * Executes arbitrary code directly via the configured judge provider
+   * (used by interview coding workspace and rapid code checks).
+   */
+  public async executeCustom(request: JudgeExecutionRequest) {
+    await this.acquireSlot();
+    try {
+      return await this.provider.execute(request);
+    } finally {
+      this.releaseSlot();
+    }
+  }
+
+  /**
    * Concurrency slot acquisition.
    */
   private async acquireSlot(): Promise<void> {

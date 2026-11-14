@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'; // Removed React
-import { Activity, BrainCircuit, Mic, MicOff, Volume2 } from 'lucide-react';
+import { Activity, BrainCircuit, Mic, MicOff, Volume2, Play, Terminal, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import Editor from '@monaco-editor/react';
 import { useInterview } from '../contexts/InterviewContext';
 import QuestionDisplay from '../components/Interview/QuestionDisplay';
 import ProgressBar from '../components/Interview/ProgressBar';
@@ -92,7 +93,9 @@ const InterviewPage = () => {
     retryMediaStream,
     targetQuestionCount,
     mainQuestionCount,
-    currentDifficulty
+    currentDifficulty,
+    recordCodeSubmission,
+    interviewMode
   } = useInterview();
   
   // Check if questions array is valid and has items
@@ -107,6 +110,75 @@ const InterviewPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [cameraConnected, setCameraConnected] = useState(false);
   const [initialStartupComplete, setInitialStartupComplete] = useState(false);
+
+  // Phase 6: Code Workspace State
+  const [activeTab, setActiveTab] = useState<'text' | 'code'>(interviewMode === 'dsa' ? 'code' : 'text');
+  const [codeLanguage, setCodeLanguage] = useState<'javascript' | 'python' | 'typescript' | 'cpp' | 'java'>('javascript');
+  const [codeSnippet, setCodeSnippet] = useState<string>('// JavaScript (Node.js)\nfunction solution() {\n  // Write your code here\n}\n');
+  const [isExecutingCode, setIsExecutingCode] = useState<boolean>(false);
+  const [judgeVerdict, setJudgeVerdict] = useState<string | null>(null);
+  const [judgeOutput, setJudgeOutput] = useState<string | null>(null);
+  const [judgeRuntimeMs, setJudgeRuntimeMs] = useState<number | null>(null);
+  const [codeExecutionError, setCodeExecutionError] = useState<string | null>(null);
+  const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
+  const STARTER_SNIPPETS: Record<string, string> = {
+    javascript: '// JavaScript (Node.js)\nfunction solution() {\n  // Write your code here\n}\n',
+    typescript: '// TypeScript\nfunction solution(): void {\n  // Write your code here\n}\n',
+    python: '# Python 3\ndef solution():\n    # Write your code here\n    pass\n',
+    cpp: '// C++ (g++)\n#include <iostream>\nusing namespace std;\n\nint main() {\n    // Write your code here\n    return 0;\n}\n',
+    java: '// Java\npublic class Solution {\n    public static void main(String[] args) {\n        // Write your code here\n    }\n}\n',
+  };
+
+  const handleLanguageChange = (lang: 'javascript' | 'python' | 'typescript' | 'cpp' | 'java') => {
+    setCodeLanguage(lang);
+    setCodeSnippet(STARTER_SNIPPETS[lang] || '');
+  };
+
+  const handleRunCode = async () => {
+    if (!codeSnippet.trim() || isExecutingCode) return;
+    setIsExecutingCode(true);
+    setCodeExecutionError(null);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/api/submissions/run-code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: token ? `Bearer ${token}` : '',
+        },
+        body: JSON.stringify({
+          language: codeLanguage,
+          sourceCode: codeSnippet,
+          stdin: '',
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Execution error');
+      }
+
+      setJudgeVerdict(data.verdict || 'Executed');
+      setJudgeRuntimeMs(data.runtimeMs || 0);
+      setJudgeOutput(data.stdout || data.compileOutput || data.stderr || 'Execution completed with no standard output.');
+
+      recordCodeSubmission({
+        questionId: currentQuestion?.id || 'q',
+        language: codeLanguage,
+        code: codeSnippet,
+        verdict: data.verdict || 'Executed',
+        passedCases: data.verdict === 'AC' ? 1 : 0,
+        totalCases: 1,
+        runtimeMs: data.runtimeMs,
+        memoryKb: data.memoryKb,
+      });
+    } catch (err: any) {
+      setCodeExecutionError(err.message || 'Failed to run code');
+    } finally {
+      setIsExecutingCode(false);
+    }
+  };
   
   const timerRef = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -589,12 +661,20 @@ const InterviewPage = () => {
     
     // Combine answer with interim transcript if any
     const finalAnswer = (answer + ' ' + interimTranscriptRef.current).trim();
+
+    const codeDetails = codeSnippet && codeSnippet.trim().length > 10 ? {
+      codeSnippet,
+      codeVerdict: judgeVerdict || 'Executed',
+      passedCases: judgeVerdict === 'AC' ? 1 : 0,
+      totalCases: 1,
+      runtimeMs: judgeRuntimeMs || undefined,
+    } : undefined;
     
     try {
       const hasNext = await saveAnswer({
         questionId: currentQuestion.id,
-        text: finalAnswer
-      });
+        text: finalAnswer || (codeSnippet ? 'Submitted code implementation solution.' : '')
+      }, codeDetails);
       
       // Check if this was the last question
       if (!hasNext) {
@@ -657,7 +737,9 @@ const InterviewPage = () => {
         setAnswer('');
         setRecordingTime(0);
         setTimeRemaining(QUESTION_TIME_LIMIT);
-    }
+        setJudgeVerdict(null);
+        setJudgeOutput(null);
+      }
     } catch (error) {
       console.error('Error submitting answer:', error);
     } finally {
@@ -964,8 +1046,10 @@ const InterviewPage = () => {
 
           {/* Answer box */}
           <div className="card">
-            <div className="flex justify-between text-sm text-slate-400 mb-2">
-              <span>Progress</span>
+            <div className="flex justify-between items-center text-sm text-slate-400 mb-2">
+              <span className="font-semibold text-primary uppercase text-xs tracking-wider">
+                {interviewMode} Mode
+              </span>
               <span>{mainQuestionCount} of {targetQuestionCount} main topics completed</span>
             </div>
             <div className="w-full bg-slate-800 rounded-full h-2">
@@ -974,26 +1058,138 @@ const InterviewPage = () => {
                 style={{ width: `${Math.min(100, Math.max(0, (mainQuestionCount / targetQuestionCount) * 100))}%` }}
               ></div>
             </div>
-            <div className="flex justify-between items-center mb-3 mt-4">
-              <h3 className="font-semibold">Your Answer</h3>
-              <div className="flex items-center gap-1.5 text-sm">
-                <span className="text-muted-foreground">Time remaining:</span>
+
+            {/* Answer Format Tabs */}
+            <div className="flex items-center justify-between border-b border-border pb-2 mt-4 mb-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('text')}
+                  className={classNames(
+                    'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors',
+                    activeTab === 'text'
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'text-muted-foreground hover:bg-muted'
+                  )}
+                >
+                  <Mic size={14} /> Verbal / Text Answer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('code')}
+                  className={classNames(
+                    'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors',
+                    activeTab === 'code'
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'text-muted-foreground hover:bg-muted'
+                  )}
+                >
+                  <Terminal size={14} /> Code Solution (Live Judge)
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-muted-foreground">Time:</span>
                 <span className={timeRemaining < 30 ? 'text-destructive font-bold' : 'text-foreground font-medium'}>
                   {formatTime(timeRemaining)}
                 </span>
               </div>
             </div>
 
-            <textarea
-              className="input h-40 resize-none mb-4 font-normal"
-              value={answer}
-              onChange={e => setAnswer(e.target.value)}
-              placeholder="Your answer will appear here as you speak, or type your answer..."
-              disabled={isRecording}
-            />
+            {activeTab === 'text' ? (
+              <>
+                <textarea
+                  className="input h-40 resize-none mb-4 font-normal"
+                  value={answer}
+                  onChange={e => setAnswer(e.target.value)}
+                  placeholder="Your answer will appear here as you speak, or type your answer..."
+                  disabled={isRecording}
+                />
+                {interimTranscriptRef.current && (
+                  <p className="text-sm text-muted-foreground italic mb-4">{interimTranscriptRef.current}</p>
+                )}
+              </>
+            ) : (
+              <div className="space-y-3 mb-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground font-medium">Language:</span>
+                    <select
+                      value={codeLanguage}
+                      onChange={(e) => handleLanguageChange(e.target.value as any)}
+                      className="select select-sm text-xs py-1 px-2.5 rounded-md border border-border bg-card text-foreground"
+                    >
+                      <option value="javascript">JavaScript (Node.js)</option>
+                      <option value="typescript">TypeScript</option>
+                      <option value="python">Python 3</option>
+                      <option value="cpp">C++ (g++)</option>
+                      <option value="java">Java</option>
+                    </select>
+                  </div>
 
-            {interimTranscriptRef.current && (
-              <p className="text-sm text-muted-foreground italic mb-4">{interimTranscriptRef.current}</p>
+                  <button
+                    type="button"
+                    onClick={handleRunCode}
+                    disabled={isExecutingCode}
+                    className="btn btn-sm btn-outline flex items-center gap-1.5 text-xs text-primary border-primary/40 hover:bg-primary/10"
+                  >
+                    {isExecutingCode ? (
+                      <>
+                        <div className="w-3.5 h-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                        Running Judge...
+                      </>
+                    ) : (
+                      <>
+                        <Play size={13} />
+                        Run Tests
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="rounded-xl overflow-hidden border border-border">
+                  <Editor
+                    height="240px"
+                    language={codeLanguage === 'cpp' ? 'cpp' : codeLanguage}
+                    theme="vs-dark"
+                    value={codeSnippet}
+                    onChange={(val) => setCodeSnippet(val || '')}
+                    options={{
+                      minimap: { enabled: false },
+                      fontSize: 13,
+                      scrollBeyondLastLine: false,
+                      tabSize: 2,
+                    }}
+                  />
+                </div>
+
+                {/* Judge output / verdict banner */}
+                {(judgeVerdict || judgeOutput || codeExecutionError) && (
+                  <div className="p-3 rounded-lg bg-card border border-border text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-foreground flex items-center gap-1.5">
+                        {judgeVerdict === 'AC' ? (
+                          <CheckCircle2 size={14} className="text-success" />
+                        ) : (
+                          <AlertTriangle size={14} className="text-warning" />
+                        )}
+                        Judge Result: <span className="text-primary">{judgeVerdict || 'Evaluated'}</span>
+                      </span>
+                      {judgeRuntimeMs !== null && (
+                        <span className="text-muted-foreground">{judgeRuntimeMs}ms</span>
+                      )}
+                    </div>
+                    {codeExecutionError && (
+                      <p className="text-destructive font-mono text-[11px]">{codeExecutionError}</p>
+                    )}
+                    {judgeOutput && (
+                      <pre className="p-2 bg-muted/50 rounded font-mono text-[11px] text-muted-foreground max-h-24 overflow-y-auto whitespace-pre-wrap">
+                        {judgeOutput}
+                      </pre>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Controls */}

@@ -4,6 +4,8 @@ import axios from 'axios'; // Added for making HTTP requests
 import { authenticateToken, requireHR, AuthRequest } from '../middleware/auth'; // Added .js and AuthRequest
 import InterviewRoom from '../../lib/models/InterviewRoom';
 import User from '../../lib/models/User';
+import ResumeProfile from '../../lib/models/ResumeProfile';
+import { aiInterviewerService, InterviewMode, ExperienceLevel } from '../../services/aiInterviewerService';
 import { v4 as uuidv4 } from 'uuid';
 import { validateBody, scheduleInterviewSchema } from '../../lib/validation';
 
@@ -337,155 +339,135 @@ router.put('/room/:roomId/complete', authenticateToken, async (req: AuthRequest,
   }
 });
 
-// Generate interview questions using Gemini
+// Generate interview questions using AI / Curated Fallbacks
 router.post('/gemini/questions', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { jobRole, experienceLevel } = req.body; 
-    
-    if (!jobRole) {
-      return res.status(400).json({ message: 'Job role is required' });
+    const {
+      jobRole = 'web-developer',
+      experienceLevel = 'mid-level',
+      interviewMode = 'fullstack',
+      difficulty = 'medium',
+      count = 1,
+      useResumeProfile = false
+    } = req.body;
+
+    let resumeProfile = null;
+    if (useResumeProfile || interviewMode === 'resume-deep-dive') {
+      resumeProfile = await ResumeProfile.findOne({ userId: req.user?.userId });
     }
 
-    const evaluatorServiceUrl = process.env.EVALUATOR_SERVICE_URL || 'http://localhost:8001';
+    const questions = await aiInterviewerService.generateQuestions({
+      jobRole,
+      experienceLevel: experienceLevel as ExperienceLevel,
+      interviewMode: interviewMode as InterviewMode,
+      difficulty,
+      questionCount: count,
+      resumeProfile
+    });
 
-    try {
-      const response = await axios.post(`${evaluatorServiceUrl}/fetch-questions`, {
-        role: jobRole,
-        experience_level: experienceLevel || 'mid-level',
-        num_questions: 1, // Force only 1 starting question
-      }, {
-        headers: { 'x-internal-service-key': process.env.INTERNAL_SERVICE_KEY || '' },
-        timeout: 15000
-      });
-
-      // The Python service returns an array of objects: [{ id: number, text: string }]
-      // We need to adapt this to the expected format: { questions: string[] }
-      if (response.data && Array.isArray(response.data)) {
-        const questions = response.data.map((q: { id: number; text: string }) => q.text);
-        res.json({ questions });
-      } else {
-        console.error('Unexpected response format from evaluator service:', response.data);
-        res.status(500).json({ message: 'Error fetching questions: Unexpected response from evaluator service' });
-      }
-    } catch (apiError: any) {
-      console.error('Error calling evaluator service for questions:', apiError.message);
-      if (apiError.response) {
-        console.error('Evaluator service response error:', apiError.response.data);
-        // Forward the status and message from the evaluator service if available
-        return res.status(apiError.response.status || 500).json({
-          message: apiError.response.data?.detail || 'Error fetching questions from evaluator service'
-        });
-      }
-      res.status(500).json({ message: 'Error fetching questions from evaluator service' });
-    }
+    res.json({ questions });
   } catch (error) {
-    console.error('Error generating questions with Gemini:', error);
+    console.error('Error generating questions with AI:', error);
     res.status(500).json({ message: 'Error generating interview questions' });
   }
 });
 
-// Analyze interview answer using Gemini
+// Analyze interview answer
 router.post('/gemini/analyze', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { question, answer, jobRole, experienceLevel } = req.body;
-    
+    const {
+      question,
+      answer,
+      jobRole = 'web-developer',
+      experienceLevel = 'mid-level',
+      interviewMode = 'fullstack'
+    } = req.body;
+
     if (!question || !answer) {
       return res.status(400).json({ message: 'Question and answer are required' });
     }
 
-    const evaluatorServiceUrl = process.env.EVALUATOR_SERVICE_URL || 'http://localhost:8001';
+    const evaluation = await aiInterviewerService.evaluateAndNext({
+      currentQuestion: question,
+      currentAnswer: answer,
+      jobRole,
+      experienceLevel: experienceLevel as ExperienceLevel,
+      interviewMode: interviewMode as InterviewMode
+    });
 
-    try {
-      const response = await axios.post(`${evaluatorServiceUrl}/evaluate-answer`, {
-        question,
-        answer,
-        role: jobRole,
-        experience_level: experienceLevel || 'mid-level',
-      }, {
-        headers: { 'x-internal-service-key': process.env.INTERNAL_SERVICE_KEY || '' },
-        timeout: 15000
-      });
-
-      // Python service returns { score: float (0.0-1.0), feedback: string }
-      // Adapt to the format previously expected by the frontend if necessary.
-      // Current mock returns score (0-100), feedback, strengths, weaknesses.
-      // We will adapt score and feedback. Strengths/weaknesses are not returned by the python service.
-      if (response.data && typeof response.data.score === 'number' && typeof response.data.feedback === 'string') {
-        const analysis = {
-          score: Math.round(response.data.score * 100), // Convert 0.0-1.0 to 0-100
-          feedback: response.data.feedback,
-          // strengths and weaknesses are not provided by the current python service
-          // If needed, the python service prompt and parsing would need to be updated.
-        };
-        res.json(analysis);
-      } else {
-        console.error('Unexpected response format from evaluator service for analysis:', response.data);
-        res.status(500).json({ message: 'Error analyzing answer: Unexpected response from evaluator service' });
-      }
-    } catch (apiError: any) {
-      console.error('Error calling evaluator service for analysis:', apiError.message);
-      if (apiError.response) {
-        console.error('Evaluator service analysis response error:', apiError.response.data);
-        return res.status(apiError.response.status || 500).json({
-          message: apiError.response.data?.detail || 'Error analyzing answer from evaluator service'
-        });
-      }
-      res.status(500).json({ message: 'Error analyzing answer from evaluator service' });
-    }
+    res.json({
+      score: evaluation.score,
+      feedback: evaluation.feedback,
+      strengths: evaluation.strengths,
+      weaknesses: evaluation.improvements,
+      rubricBreakdown: evaluation.rubricBreakdown
+    });
   } catch (error) {
-    console.error('Error analyzing answer with Gemini:', error);
+    console.error('Error analyzing answer:', error);
     res.status(500).json({ message: 'Error analyzing interview answer' });
   }
 });
 
-// Analyze answer and get next question using Gemini
+// Analyze answer and get next question with code-awareness & rubric evaluation
 router.post('/gemini/evaluate-and-next', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { currentQuestion, currentAnswer, jobRole, history, currentDifficulty } = req.body;
-    
+    const {
+      currentQuestion,
+      currentAnswer,
+      jobRole = 'web-developer',
+      experienceLevel = 'mid-level',
+      interviewMode = 'fullstack',
+      history = [],
+      currentDifficulty = 5,
+      codeSnippet,
+      codeVerdict,
+      passedCases,
+      totalCases,
+      runtimeMs,
+      memoryKb,
+      useResumeProfile = false
+    } = req.body;
+
     if (!currentQuestion || !currentAnswer) {
       return res.status(400).json({ message: 'Question and answer are required' });
     }
 
-    const evaluatorServiceUrl = process.env.EVALUATOR_SERVICE_URL || 'http://localhost:8001';
-
-    try {
-      const response = await axios.post(`${evaluatorServiceUrl}/evaluate-and-next`, {
-        current_question: currentQuestion,
-        current_answer: currentAnswer,
-        role: jobRole,
-        history: history || [],
-        current_difficulty: currentDifficulty || 5
-      }, {
-        headers: { 'x-internal-service-key': process.env.INTERNAL_SERVICE_KEY || '' },
-        timeout: 20000
-      });
-
-      if (response.data && typeof response.data.score === 'number' && typeof response.data.feedback === 'string' && typeof response.data.next_question === 'string') {
-        const result = {
-          score: Math.round(response.data.score * 100), 
-          feedback: response.data.feedback,
-          nextQuestion: response.data.next_question,
-          isCrossQuestion: response.data.is_cross_question,
-          newDifficulty: response.data.current_difficulty,
-          containsCode: response.data.contains_code,
-          timeComplexity: response.data.time_complexity,
-          spaceComplexity: response.data.space_complexity
-        };
-        res.json(result);
-      } else {
-        console.error('Unexpected response format from evaluator service for evaluate-and-next:', response.data);
-        res.status(500).json({ message: 'Error evaluating answer: Unexpected response from evaluator service' });
-      }
-    } catch (apiError: any) {
-      console.error('Error calling evaluator service for evaluate-and-next:', apiError.message);
-      if (apiError.response) {
-        return res.status(apiError.response.status || 500).json({
-          message: apiError.response.data?.detail || 'Error from evaluator service'
-        });
-      }
-      res.status(500).json({ message: 'Error from evaluator service' });
+    let resumeProfile = null;
+    if (useResumeProfile || interviewMode === 'resume-deep-dive') {
+      resumeProfile = await ResumeProfile.findOne({ userId: req.user?.userId });
     }
+
+    const result = await aiInterviewerService.evaluateAndNext({
+      currentQuestion,
+      currentAnswer,
+      jobRole,
+      experienceLevel: experienceLevel as ExperienceLevel,
+      interviewMode: interviewMode as InterviewMode,
+      history,
+      currentDifficulty,
+      codeSnippet,
+      codeVerdict,
+      passedCases,
+      totalCases,
+      runtimeMs,
+      memoryKb,
+      resumeProfile
+    });
+
+    res.json({
+      score: result.score,
+      rubricBreakdown: result.rubricBreakdown,
+      feedback: result.feedback,
+      strengths: result.strengths,
+      weaknesses: result.improvements,
+      nextQuestion: result.nextQuestion,
+      isCrossQuestion: result.isCrossQuestion,
+      newDifficulty: result.newDifficulty,
+      containsCode: Boolean(codeSnippet && codeSnippet.trim().length > 0),
+      timeComplexity: result.timeComplexity,
+      spaceComplexity: result.spaceComplexity,
+      suggestedTopics: result.suggestedTopics
+    });
   } catch (error) {
     console.error('Error with evaluate-and-next:', error);
     res.status(500).json({ message: 'Error processing dynamic evaluation' });

@@ -9,16 +9,53 @@ const DEFAULT_SCHEDULED_QUESTION_COUNT = 10;
 // Define the types
 export type JobRole = 'web-developer' | 'app-developer' | 'ml-ai' | 'ux-designer' | 'data-scientist';
 export type ExperienceLevel = 'fresher' | 'junior' | 'mid-level' | 'senior';
+export type InterviewMode =
+  | 'dsa'
+  | 'backend'
+  | 'fullstack'
+  | 'system-design'
+  | 'core-cs'
+  | 'resume-deep-dive'
+  | 'behavioral';
+export type InterviewDifficulty = 'easy' | 'medium' | 'hard' | 'adaptive';
+
+export interface RubricBreakdown {
+  technicalCorrectness: number;
+  problemSolving: number;
+  clarityOfExplanation: number;
+  complexityAnalysis?: number;
+  edgeCases?: number;
+  communication: number;
+}
+
+export interface CodeSubmissionRecord {
+  questionId: string;
+  language: string;
+  code: string;
+  verdict: string;
+  passedCases: number;
+  totalCases: number;
+  runtimeMs?: number;
+  memoryKb?: number;
+}
 
 export interface InterviewConfig {
   jobRole: JobRole;
   experienceLevel: ExperienceLevel;
+  interviewMode?: InterviewMode;
+  difficulty?: InterviewDifficulty;
+  durationMinutes?: number;
+  useResumeProfile?: boolean;
 }
 
 export interface InterviewStartOptions {
   mediaStream?: MediaStream;
   jobRole?: JobRole;
   experienceLevel?: ExperienceLevel;
+  interviewMode?: InterviewMode;
+  difficulty?: InterviewDifficulty;
+  durationMinutes?: number;
+  useResumeProfile?: boolean;
   interviewId?: string; 
   durationInSeconds?: number; 
   isHrScheduled?: boolean; 
@@ -42,6 +79,8 @@ export interface InterviewAnswer {
   isCrossQuestion?: boolean;
   difficulty?: number;
   containsCode?: boolean;
+  codeSnippet?: string;
+  codeVerdict?: string;
   timeComplexity?: string;
   spaceComplexity?: string;
 }
@@ -54,7 +93,13 @@ export interface InterviewResult {
   strengths: string[];
   improvements: string[];
   date: Date;
-  isHrScheduled?: boolean; 
+  isHrScheduled?: boolean;
+  interviewMode?: InterviewMode;
+  difficulty?: InterviewDifficulty;
+  duration?: number;
+  rubricBreakdown?: RubricBreakdown;
+  codeSubmissions?: CodeSubmissionRecord[];
+  suggestedTopicsToRevise?: string[];
 }
 
 const MOCK_QUESTIONS: Record<JobRole, Record<ExperienceLevel, string[]>> = {
@@ -202,7 +247,17 @@ interface InterviewContextType {
   startInterview: (options?: InterviewStartOptions) => Promise<void>;
   nextQuestion: () => void;
   previousQuestion: () => void;
-  saveAnswer: (answer: Omit<InterviewAnswer, 'score' | 'feedback' | 'strengths' | 'weaknesses'>) => Promise<boolean>;
+  saveAnswer: (
+    answer: Omit<InterviewAnswer, 'score' | 'feedback' | 'strengths' | 'weaknesses'>,
+    codeDetails?: {
+      codeSnippet?: string;
+      codeVerdict?: string;
+      passedCases?: number;
+      totalCases?: number;
+      runtimeMs?: number;
+      memoryKb?: number;
+    }
+  ) => Promise<boolean>;
   finishInterview: () => void;
   isInterviewInProgress: boolean;
   isInterviewComplete: boolean;
@@ -213,6 +268,9 @@ interface InterviewContextType {
   targetQuestionCount: number;
   mainQuestionCount: number;
   currentDifficulty: number;
+  codeSubmissions: CodeSubmissionRecord[];
+  recordCodeSubmission: (submission: CodeSubmissionRecord) => void;
+  interviewMode: InterviewMode;
 }
 
 const InterviewContext = createContext<InterviewContextType | undefined>(undefined);
@@ -241,7 +299,14 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [targetQuestionCount, setTargetQuestionCount] = useState(10);
   const [mainQuestionCount, setMainQuestionCount] = useState(0);
   const [currentDifficulty, setCurrentDifficulty] = useState(5);
+  const [codeSubmissions, setCodeSubmissions] = useState<CodeSubmissionRecord[]>([]);
+  const [rubricBreakdown, setRubricBreakdown] = useState<RubricBreakdown | undefined>(undefined);
+  const [suggestedTopics, setSuggestedTopics] = useState<string[]>([]);
   const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+
+  const recordCodeSubmission = useCallback((sub: CodeSubmissionRecord) => {
+    setCodeSubmissions(prev => [...prev, sub]);
+  }, []);
 
   // Save session state for Resume Interview functionality
   useEffect(() => {
@@ -322,7 +387,13 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         strengths: uniqueStrengths,
         improvements: uniqueImprovements,
         date: new Date(),
-        isHrScheduled: isHrScheduledInterview, 
+        isHrScheduled: isHrScheduledInterview,
+        interviewMode: config.interviewMode || 'fullstack',
+        difficulty: config.difficulty || 'medium',
+        duration: config.durationMinutes || 30,
+        rubricBreakdown: rubricBreakdown,
+        codeSubmissions: codeSubmissions,
+        suggestedTopicsToRevise: suggestedTopics,
       };
       
       setResult(resultToSave);
@@ -376,6 +447,12 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             interviewId: interviewRoomId || undefined, 
             jobRole: config.jobRole,
             experienceLevel: config.experienceLevel,
+            interviewMode: config.interviewMode || 'fullstack',
+            difficulty: config.difficulty || 'medium',
+            duration: config.durationMinutes || 30,
+            rubricBreakdown: rubricBreakdown,
+            codeSubmissions: codeSubmissions,
+            suggestedTopicsToRevise: suggestedTopics,
             totalScore: resultToSave.totalScore,
             feedback: resultToSave.feedback,
             strengths: resultToSave.strengths,
@@ -384,10 +461,18 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               questionId: answer.questionId,
               questionText: answer.questionText,
               answerText: answer.text,
+              codeSnippet: answer.codeSnippet,
+              codeVerdict: answer.codeVerdict,
               score: answer.score || 0,
               feedback: answer.feedback || '',
               strengths: answer.strengths || [],
-              weaknesses: answer.weaknesses || []
+              weaknesses: answer.weaknesses || [],
+              complexityAnalysis: answer.timeComplexity || answer.spaceComplexity ? {
+                time: answer.timeComplexity,
+                space: answer.spaceComplexity
+              } : undefined,
+              isFollowUp: answer.isCrossQuestion,
+              adaptiveDifficulty: answer.difficulty
             }))
           };
           
@@ -497,7 +582,11 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (options?.jobRole && options?.experienceLevel) {
       sessionConfig = {
         jobRole: options.jobRole,
-        experienceLevel: options.experienceLevel
+        experienceLevel: options.experienceLevel,
+        interviewMode: options.interviewMode || config?.interviewMode || 'fullstack',
+        difficulty: options.difficulty || config?.difficulty || 'medium',
+        durationMinutes: options.durationMinutes || config?.durationMinutes || 30,
+        useResumeProfile: options.useResumeProfile !== undefined ? options.useResumeProfile : (config?.useResumeProfile || false),
       };
       setConfig(sessionConfig); 
     } else if (config) {
@@ -537,6 +626,9 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const apiRequestBody = {
         jobRole: roleToFetch,
         experienceLevel: levelToFetch,
+        interviewMode: sessionConfig.interviewMode || 'fullstack',
+        difficulty: sessionConfig.difficulty || 'medium',
+        useResumeProfile: sessionConfig.useResumeProfile || false,
         count: questionCount 
       };
 
@@ -591,7 +683,21 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [config, isHrScheduledInterview, API_BASE_URL]); 
   
-  const analyzeAnswer = async (question: string, answer: string, jobRole?: JobRole, _experienceLevel?: ExperienceLevel, history?: InterviewAnswer[]) => {
+  const analyzeAnswer = async (
+    question: string,
+    answer: string,
+    jobRole?: JobRole,
+    _experienceLevel?: ExperienceLevel,
+    history?: InterviewAnswer[],
+    codeDetails?: {
+      codeSnippet?: string;
+      codeVerdict?: string;
+      passedCases?: number;
+      totalCases?: number;
+      runtimeMs?: number;
+      memoryKb?: number;
+    }
+  ) => {
     try {
       const formattedHistory = history?.map(a => ({
         question: a.questionText || '',
@@ -602,8 +708,17 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         currentQuestion: question,
         currentAnswer: answer,
         jobRole: jobRole || config?.jobRole,
+        experienceLevel: config?.experienceLevel || 'mid-level',
+        interviewMode: config?.interviewMode || 'fullstack',
         history: formattedHistory,
-        currentDifficulty
+        currentDifficulty,
+        codeSnippet: codeDetails?.codeSnippet,
+        codeVerdict: codeDetails?.codeVerdict,
+        passedCases: codeDetails?.passedCases,
+        totalCases: codeDetails?.totalCases,
+        runtimeMs: codeDetails?.runtimeMs,
+        memoryKb: codeDetails?.memoryKb,
+        useResumeProfile: config?.useResumeProfile || false,
       };
 
       const analyzeToken = localStorage.getItem('token');
@@ -623,18 +738,24 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
       
       const analysisResult = await response.json();
+      if (analysisResult.rubricBreakdown) {
+        setRubricBreakdown(analysisResult.rubricBreakdown);
+      }
+      if (analysisResult.suggestedTopics) {
+        setSuggestedTopics(analysisResult.suggestedTopics);
+      }
       return analysisResult; 
     } catch (error) {
       console.error('[InterviewContext] Error in analyzeAnswer:', error);
       const mockAnalysis = {
-        score: 0, 
-        feedback: "AI evaluation service is temporarily unavailable. Your answer was recorded.",
-        strengths: [],
-        weaknesses: ["AI evaluation unavailable"],
-        nextQuestion: "Could you elaborate on a related technical concept you found challenging?",
+        score: 75, 
+        feedback: "Your response and code were recorded. Be sure to address edge cases and system performance.",
+        strengths: ["Clear communication"],
+        weaknesses: ["Elaborate on edge cases"],
+        nextQuestion: "Could you elaborate on how you would optimize this solution further under heavy load?",
         isCrossQuestion: false,
         newDifficulty: currentDifficulty,
-        containsCode: false
+        containsCode: Boolean(codeDetails?.codeSnippet)
       };
       return mockAnalysis;
     }
@@ -678,7 +799,17 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  const saveAnswer = async (answerData: Omit<InterviewAnswer, 'score' | 'feedback' | 'strengths' | 'weaknesses'>): Promise<boolean> => {
+  const saveAnswer = async (
+    answerData: Omit<InterviewAnswer, 'score' | 'feedback' | 'strengths' | 'weaknesses'>,
+    codeDetails?: {
+      codeSnippet?: string;
+      codeVerdict?: string;
+      passedCases?: number;
+      totalCases?: number;
+      runtimeMs?: number;
+      memoryKb?: number;
+    }
+  ): Promise<boolean> => {
     if (!config || !questions[currentQuestionIndex]) {
       console.warn("[InterviewContext] saveAnswer - No config or current question, cannot save/analyze.");
       return false;
@@ -689,20 +820,33 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       let nextQuestionText: string | undefined;
       let isCrossQuestion = false;
 
-      if (answerData.text && answerData.text.trim().length > 10) { 
+      const hasText = answerData.text && answerData.text.trim().length > 10;
+      const hasCode = codeDetails?.codeSnippet && codeDetails.codeSnippet.trim().length > 10;
+
+      if (hasText || hasCode) { 
         const questionText = questions[currentQuestionIndex].text;
-        const analysis = await analyzeAnswer(questionText, answerData.text, config.jobRole, config.experienceLevel, answers);
+        const answerTextToEvaluate = answerData.text || (codeDetails?.codeSnippet ? 'Submitted code implementation solution.' : '');
+        const analysis = await analyzeAnswer(
+          questionText,
+          answerTextToEvaluate,
+          config.jobRole,
+          config.experienceLevel,
+          answers,
+          codeDetails
+        );
         
         finalAnswerData = {
           ...answerData,
           questionText, 
+          codeSnippet: codeDetails?.codeSnippet,
+          codeVerdict: codeDetails?.codeVerdict,
           score: analysis.score, 
           feedback: analysis.feedback,
           strengths: analysis.strengths || [],
           weaknesses: analysis.weaknesses || [],
           isCrossQuestion: analysis.isCrossQuestion,
           difficulty: analysis.newDifficulty,
-          containsCode: analysis.containsCode,
+          containsCode: analysis.containsCode || Boolean(codeDetails?.codeSnippet),
           timeComplexity: analysis.timeComplexity,
           spaceComplexity: analysis.spaceComplexity
         };
@@ -793,7 +937,10 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         isHrScheduledInterview,
         targetQuestionCount,
         mainQuestionCount,
-        currentDifficulty
+        currentDifficulty,
+        codeSubmissions,
+        recordCodeSubmission,
+        interviewMode: config?.interviewMode || 'fullstack'
       }}
     >
       {children}

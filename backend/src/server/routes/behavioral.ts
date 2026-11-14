@@ -1,7 +1,7 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import { BehavioralQuestion, StarStory } from '../../lib/models/BehavioralPrep';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthRequest } from '../middleware/auth';
 import {
   validateBody,
   createStarStorySchema,
@@ -39,7 +39,7 @@ router.get('/questions', async (req, res) => {
  * GET /api/behavioral/stories
  * Retrieve all saved STAR stories for the authenticated candidate
  */
-router.get('/stories', authenticateToken, async (req, res) => {
+router.get('/stories', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user?.userId;
     if (!userId) {
@@ -68,7 +68,7 @@ router.post(
   '/stories',
   authenticateToken,
   validateBody(createStarStorySchema),
-  async (req, res) => {
+  async (req: AuthRequest, res) => {
     try {
       const userId = req.user?.userId;
       if (!userId) {
@@ -119,7 +119,7 @@ router.post(
  * GET /api/behavioral/stories/:id
  * Retrieve a single STAR story (IDOR protected)
  */
-router.get('/stories/:id', authenticateToken, async (req, res) => {
+router.get('/stories/:id', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user?.userId;
     if (!userId) {
@@ -158,7 +158,7 @@ router.put(
   '/stories/:id',
   authenticateToken,
   validateBody(updateStarStorySchema),
-  async (req, res) => {
+  async (req: AuthRequest, res) => {
     try {
       const userId = req.user?.userId;
       if (!userId) {
@@ -224,7 +224,7 @@ router.put(
  * DELETE /api/behavioral/stories/:id
  * Delete a STAR story (IDOR protected)
  */
-router.delete('/stories/:id', authenticateToken, async (req, res) => {
+router.delete('/stories/:id', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user?.userId;
     if (!userId) {
@@ -261,7 +261,7 @@ router.delete('/stories/:id', authenticateToken, async (req, res) => {
  * POST /api/behavioral/stories/:id/feedback
  * Generate structured feedback for a STAR story using evaluation rubric
  */
-router.post('/stories/:id/feedback', authenticateToken, async (req, res) => {
+router.post('/stories/:id/feedback', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user?.userId;
     if (!userId) {

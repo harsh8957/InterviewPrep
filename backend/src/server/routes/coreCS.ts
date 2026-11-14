@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import { CoreCSQuizItem, CoreCSSubject } from '../../lib/models/CoreCSQuizItem';
 import { ConceptAttempt } from '../../lib/models/ConceptAttempt';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { validateBody, createConceptAttemptSchema } from '../../lib/validation';
 import { getJwtSecret } from '../../lib/jwt';
 
@@ -238,7 +238,7 @@ router.get('/:subject/items', async (req, res) => {
  * POST /api/core-cs/attempts
  * Server-side grading of candidate answer, saving attempt and returning official explanation.
  */
-router.post('/attempts', authenticateToken, validateBody(createConceptAttemptSchema), async (req, res) => {
+router.post('/attempts', authenticateToken, validateBody(createConceptAttemptSchema), async (req: AuthRequest, res) => {
   try {
     const { itemId, selectedOption, timeSpentSeconds } = req.body;
     const userId = req.user?.userId;
@@ -306,7 +306,7 @@ router.post('/attempts', authenticateToken, validateBody(createConceptAttemptSch
  * GET /api/core-cs/attempts
  * Retrieve candidate's attempt history and mastery metrics
  */
-router.get('/attempts', authenticateToken, async (req, res) => {
+router.get('/attempts', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user?.userId;
     if (!userId) {

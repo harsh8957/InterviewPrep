@@ -1,8 +1,8 @@
 # InterviewPrep — Implementation Progress & Tracking
 
 **Repository:** `D:\InterviewPrep\InterviewPrep`
-**Current Phase:** Phase 5 — Core CS, System Design & Behavioral Preparation
-**Status:** **PHASE 5 FULLY COMPLETED & VERIFIED** (Ready for User Acceptance)
+**Current Phase:** Phase 6 — Advanced AI Interviewer & Resume-Based Preparation
+**Status:** **PHASE 6 FULLY COMPLETED & VERIFIED** (Ready for User Acceptance)
 **Last Updated:** 2026-11-14
 
 ---
@@ -16,7 +16,7 @@
 | **Phase 3** | DSA Roadmap, Problem Bank & Coding Practice Workspace | **COMPLETED** | 2026-11-13 |
 | **Phase 4** | Online Coding Judge & Timed Assessments | **COMPLETED** | 2026-11-13 |
 | **Phase 5** | Core CS & System Design Modules | **COMPLETED** | 2026-11-14 |
-| **Phase 6** | Code-Aware & Resume-Driven AI Mock Interviews | PENDING | — |
+| **Phase 6** | Code-Aware & Resume-Driven AI Mock Interviews | **COMPLETED** | 2026-11-14 |
 | **Phase 7** | Company-Specific Prep Tracks & Experiences | PENDING | — |
 | **Phase 8** | Progress Analytics, Bookmarks & Profiles | PENDING | — |
 | **Phase 9** | Security Hardening, Performance & Deployment Readiness | PENDING | — |
@@ -144,6 +144,29 @@
    - Seeded 4 interactive System Design cases: Distributed Rate Limiter (Token Bucket), TinyURL (Snowflake / Base62), Real-Time Chat Engine (WebSockets / Kafka / Cassandra), and E-Commerce Flash Sale (Redis DECR / Saga / Queue).
    - Seeded 4 behavioral competency questions with model STAR answers.
 
+### 2.8 Code-Aware & Resume-Driven AI Mock Interviews (Phase 6)
+1. **7 Distinct Interview Tracks & Tailored Parameters:**
+   - Supported Modes: DSA Coding Round (`dsa`), Backend Development (`backend`), Full-Stack Engineering (`fullstack`), System Design Architecture (`system-design`), Core Computer Science (`core-cs`), Resume Deep-Dive (`resume-deep-dive`), and Behavioral Round (`behavioral`).
+   - Configuration Parameters: Candidate customizable Target Role (Full-Stack, Backend, Frontend, DevOps, ML/AI), Experience Level (`fresher`, `junior`, `mid-level`, `senior`), Difficulty (`easy`, `medium`, `hard`, `adaptive`), and Session Duration (15, 30, 45, 60 minutes).
+2. **Secure PDF Resume Upload, Parsing & Prompt Injection Defense:**
+   - Database Model: `ResumeProfile` (`userId`, `fileName`, `fileSizeBytes`, `rawTextSummary`, `skills`, `education`, `experience`, `projects`, `technologies`, `achievements`, `targetRole`, `potentialDiscussionAreas`, `atsScore`, `atsStrengths`, `atsImprovements`).
+   - Security Validation: Memory-only upload processing via `multer.memoryStorage()`, 5MB size limit, PDF magic-byte verification (`%PDF-`), and encrypted/password-protected file rejection.
+   - Strict Ownership & IDOR Protection: Resume retrieval, replacement, and deletion endpoints (`GET /api/resume/profile`, `DELETE /api/resume/profile`) enforce candidate user ID binding with 403 authorization guards.
+   - Prompt Injection Defense: Resume content parsed via `pdf-parse` is sanitized and quarantined within `<candidate_resume_untrusted_input>` blocks with explicit evaluator directives that candidate resume text cannot override system instructions, scoring rules, or output schemas.
+   - Verified Project Questions: In `resume-deep-dive` mode, AI interviewer generates technical questions strictly tied to the candidate's verified projects and claimed stack without hallucinating unlisted technologies.
+3. **In-Interview Live Code Execution (Code-Aware AI):**
+   - Live Code Runner: Embedded Monaco editor inside `InterviewPage.tsx` with a dual-tab switcher (Verbal/Text Answer vs. Live Code Solution) and multi-language support (JavaScript, TypeScript, Python 3, C++, Java).
+   - Authenticated Execution Endpoint: `POST /api/submissions/run-code` leverages `judgeService.executeCustom` to run arbitrary candidate code against custom inputs via secure judge provider with per-user rate limiting.
+   - Truthful AI Evaluation: Real execution metrics (`codeVerdict`, `passedCases`, `totalCases`, `runtimeMs`, `memoryKb`) are passed directly to the AI evaluator; the AI is strictly prohibited from fabricating execution results.
+4. **Structured 6-Dimension AI Rubric & Adaptive Flow:**
+   - 6 Evaluation Criteria: Technical Correctness, Problem Solving, Clarity of Explanation, Complexity Analysis, Edge Cases, and Communication.
+   - Adaptive Follow-Ups: Dynamic generation of cross-questions adjusting difficulty based on candidate response quality.
+   - Deterministic Fallback: When upstream AI services are unconfigured or unavailable, deterministic heuristic analysis computes authentic rubric scores based on keyword coverage, length, and code verdict without dropping interview sessions.
+5. **Comprehensive Result Experience:**
+   - Visual Scorecard: Prominent Educational Assessment Disclaimer ("not a certified hiring decision"), Mode / Difficulty / Duration badges, and 6-dimension visual progress meters.
+   - Code History: Integrated Submitted Code Solutions drawer showing syntax-styled snippets, execution verdicts, and runtimes.
+   - Curriculum Reconnection: Recommended revision topics linked directly to `/roadmap`, `/problems`, and `/core-cs`.
+
 ---
 
 ## 3. Changed Files Log
@@ -238,6 +261,20 @@
 | `frontend/src/pages/SystemDesignPage.tsx` | Catalog of distributed architecture cases with HLD/LLD filtering and direct workspace links. |
 | `frontend/src/pages/SystemDesignWorkspacePage.tsx` | Interactive split-screen studio with Requirements, Capacity Math, APIs, Tradeoffs, Rubric sliders, and Mermaid editor. |
 | `frontend/src/pages/InterviewTipsPage.tsx` | Integrated Behavioral Hub with STAR Story Builder, personal story bank, competency bank, and strategy guides. |
+| `backend/src/lib/models/ResumeProfile.ts` | Schema for parsed candidate resume profiles, extracted skills, projects, and ATS score. |
+| `backend/src/lib/models/InterviewResult.ts` | Schema updated with `interviewMode`, `difficulty`, `duration`, `resumeProfileId`, `codeSubmissions`, `rubricBreakdown`, and `suggestedTopicsToRevise`. |
+| `backend/src/services/resumeService.ts` | Secure PDF extraction service with magic byte header validation, prompt injection quarantine, and profile structuring. |
+| `backend/src/services/aiInterviewerService.ts` | Centralized interview orchestrator for 7 modes, verified resume grounding, code-aware evaluations, and deterministic heuristic fallback. |
+| `backend/src/services/judge/judgeService.ts` | Added `executeCustom` method for ad-hoc in-interview code execution. |
+| `backend/src/server/routes/submissions.ts` | Added `POST /api/submissions/run-code` with per-user rate limiting and live execution. |
+| `backend/src/server/routes/interviews.ts` | Upgraded question generation and answer evaluation with 7 modes and resume grounding. |
+| `backend/src/server/routes/interviewResults.ts` | Updated persistence and retrieval for Phase 6 metrics and resume population. |
+| `backend/src/server/routes/resume.ts` | Implemented `POST /upload`, `GET /profile`, and `DELETE /profile` with IDOR protection. |
+| `backend/tests/interviewPhase6.test.ts` | Automated test suite covering PDF validation, prompt quarantine, resume CRUD, 7 interview modes, code execution, and rubric evaluation. |
+| `frontend/src/contexts/InterviewContext.tsx` | Upgraded context with 7 modes, difficulty, duration, resume profile options, live code submissions, and rubric persistence. |
+| `frontend/src/pages/SetupPage.tsx` | Interactive setup interface with 7 interview mode cards, role/difficulty/duration selectors, and resume upload dropzone. |
+| `frontend/src/pages/InterviewPage.tsx` | Split-screen interview room with verbal text and Monaco code editor tabs, live judge execution, and adaptive difficulty indicator. |
+| `frontend/src/pages/ResultDetailPage.tsx` | Upgraded results page with educational disclaimer, mode badges, 6-dimension rubric meters, code solution drawer, and revision topic links. |
 
 ---
 
@@ -246,13 +283,14 @@
 | Suite | Checks Run | Passed | Failed | Key Verification Results |
 | :--- | :--- | :--- | :--- | :--- |
 | **Frontend TypeScript Compile** | `npx tsc --noEmit` | **PASS** | 0 | Exit code 0, zero TypeScript errors across all workspace components and routes. |
-| **Frontend Production Build** | `npm run build` (`vite`) | **PASS** | 0 | Built 70+ chunks with Mermaid.js integration, clean lazy loading, and zero fatal errors. |
+| **Frontend Production Build** | `npm run build` (`vite`) | **PASS** | 0 | Built 70+ chunks with Monaco editor, Mermaid.js integration, clean lazy loading, and zero fatal errors. |
 | **Frontend Lint** | `npm run lint` (`eslint`) | **PASS** | 0 | Exit code 0, 0 errors across all frontend files. |
-| **Backend TypeScript Compile** | `npx tsc --noEmit` | **PASS** | 0 | Exit code 0, zero TypeScript errors across all models, routers, and scripts. |
-| **Backend Production Build** | `npm run build` (`tsup`) | **PASS** | 0 | `dist/index.js 148.48 KB` built in 151ms. |
+| **Backend TypeScript Compile** | `npx tsc --noEmit` | **PASS** | 0 | Exit code 0, zero TypeScript errors across all models, routers, and services. |
+| **Backend Production Build** | `npm run build` (`tsc -p tsconfig.json`) | **PASS** | 0 | Built cleanly to `dist/` with zero compiler errors. |
+| **Backend Phase 6 AI & Resume Suite** | `tests/interviewPhase6.test.ts` | **14** | **0** | Verified PDF magic byte validation, prompt injection quarantine, resume CRUD IDOR isolation, 7 interview modes, code-aware rubric evaluation, and result persistence. |
 | **Backend Core CS & System Design** | `vitest run tests/coreCS.test.ts` | **19** | **0** | All 19 Phase 5 automated tests pass (confidentiality, server grading, system design drafts, IDOR story CRUD). |
 | **Backend Judge & Execution Suite** | `vitest run tests/judge.test.ts` | **11** | **0** | All 11 Phase 4 judge tests pass (AC, WA, TLE, CE, RE, confidentiality, rate limiting). |
 | **Backend Assessment Suite** | `vitest run tests/assessment.test.ts` | **7** | **0** | All 7 Phase 4 assessment tests pass (start, resume, late expiry 403, scorecard). |
 | **Backend DSA API Suite** | `vitest run tests/dsa.test.ts` | **13** | **0** | All 13 Phase 3 automated unit & integration tests pass (roadmaps, problem catalog, confidentiality, admin CRUD). |
 | **Backend Security Regression** | `vitest run tests/security.test.ts` | **8** | **0** | All 8 Phase 1 security regression tests continue to pass. |
-| **Total Backend Test Coverage** | `vitest run` (all 5 suites) | **58** | **0** | **58 passing tests, 0 failures, 0 regressions.** |
+| **Total Backend Test Coverage** | Vitest test suites (all 6 suites) | **72** | **0** | **72 passing tests, 0 failures, 0 regressions.** |

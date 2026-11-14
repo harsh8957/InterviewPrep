@@ -99,6 +99,44 @@ router.post('/', validateBody(createSubmissionSchema), async (req: AuthRequest, 
 });
 
 /**
+ * POST /api/submissions/run-code
+ * Runs arbitrary candidate code against custom or sample inputs via the secure Judge service.
+ * Used in interview coding workspace and rapid testing.
+ */
+router.post('/run-code', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { sourceCode, language, stdin = '', expectedStdout } = req.body;
+
+    if (!sourceCode || !language) {
+      return res.status(400).json({ message: 'sourceCode and language are required' });
+    }
+
+    const rateCheck = judgeService.checkRateLimit(userId);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({
+        message: `Too many submissions. Please wait ${rateCheck.retryAfterSec} seconds.`,
+        retryAfterSec: rateCheck.retryAfterSec,
+      });
+    }
+
+    const result = await judgeService.executeCustom({
+      sourceCode,
+      language,
+      stdin,
+      expectedStdout,
+      timeLimitSec: 2.0,
+      memoryLimitKb: 128000,
+    });
+
+    return res.json(result);
+  } catch (error: any) {
+    console.error('Error running custom code:', error);
+    return res.status(500).json({ message: 'Error executing code' });
+  }
+});
+
+/**
  * GET /api/submissions/:id
  * Fetches submission status and sanitized results.
  * Strictly enforces IDOR protection and hides confidential test inputs.

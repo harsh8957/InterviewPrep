@@ -2,7 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { SystemDesignCase } from '../../lib/models/SystemDesignCase';
 import { SystemDesignSubmission } from '../../lib/models/SystemDesignSubmission';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { validateBody, saveSystemDesignSubmissionSchema } from '../../lib/validation';
 import { aiService } from '../../services/aiService';
 
@@ -76,7 +76,7 @@ router.get('/:slug', async (req, res) => {
  * GET /api/system-design/:slug/attempt
  * Retrieve candidate's saved diagram, notes, and rubric scores
  */
-router.get('/:slug/attempt', authenticateToken, async (req, res) => {
+router.get('/:slug/attempt', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user?.userId;
     if (!userId) {
@@ -114,7 +114,7 @@ router.post(
   '/:slug/save',
   authenticateToken,
   validateBody(saveSystemDesignSubmissionSchema),
-  async (req, res) => {
+  async (req: AuthRequest, res) => {
     try {
       const userId = req.user?.userId;
       if (!userId) {
@@ -165,7 +165,7 @@ router.post(
  * POST /api/system-design/:slug/critique
  * Optional AI architectural critique & rubric assessment
  */
-router.post('/:slug/critique', authenticateToken, async (req, res) => {
+router.post('/:slug/critique', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user?.userId;
     if (!userId) {

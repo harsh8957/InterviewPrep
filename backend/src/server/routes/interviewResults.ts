@@ -2,6 +2,7 @@ import express, { Request } from 'express'; // Import Request for untyped routes
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import InterviewResult from '../../lib/models/InterviewResult';
 import InterviewRoom from '../../lib/models/InterviewRoom';
+import ResumeProfile from '../../lib/models/ResumeProfile';
 
 const router = express.Router();
 
@@ -20,16 +21,20 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
     if (userRole === 'hr') {
       // For HR users, get results for all their interviews
       const interviews = await InterviewRoom.find({ hr: userId });
-      const interviewIds = interviews.map(interview => interview._id); // Mongoose should infer 'interview' type here from 'interviews'
+      const interviewIds = interviews.map(interview => interview._id);
       
       results = await InterviewResult.find({
         interviewId: { $in: interviewIds } 
-      }).sort({ createdAt: -1 });
+      })
+        .populate('resumeProfileId', 'skills targetRole atsScore')
+        .sort({ createdAt: -1 });
     } else {
       // For candidates, get only their results
       results = await InterviewResult.find({ 
         candidateId: userId 
-      }).sort({ createdAt: -1 });
+      })
+        .populate('resumeProfileId', 'skills targetRole atsScore')
+        .sort({ createdAt: -1 });
     }
     
     res.json(results);
@@ -69,7 +74,9 @@ router.get('/interview/:interviewId', authenticateToken, async (req: AuthRequest
     
     // Find results for this interview
     console.log(`Searching for results with interviewId: ${interviewId}`);
-    const results = await InterviewResult.find({ interviewId }).sort({ createdAt: -1 });
+    const results = await InterviewResult.find({ interviewId })
+      .populate('resumeProfileId')
+      .sort({ createdAt: -1 });
     
     if (results.length === 0) {
       console.log(`No results found for interview ID: ${interviewId}`);
@@ -100,7 +107,7 @@ router.get('/interview/:interviewId', authenticateToken, async (req: AuthRequest
 // Get interview result by ID
 router.get('/:id', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const result = await InterviewResult.findById(req.params.id);
+    const result = await InterviewResult.findById(req.params.id).populate('resumeProfileId');
     
     if (!result) {
       return res.status(404).json({ message: 'Interview result not found' });
@@ -134,6 +141,13 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
       interviewId,
       jobRole,
       experienceLevel,
+      interviewMode = 'fullstack',
+      difficulty = 'medium',
+      duration = 30,
+      resumeProfileId,
+      codeSubmissions = [],
+      rubricBreakdown,
+      suggestedTopicsToRevise = [],
       totalScore,
       feedback,
       strengths,
@@ -152,9 +166,6 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
       
       if (!interviewDocument) {
         console.log(`InterviewRoom not found with roomLink containing UUID: ${interviewId}`);
-        // Optionally, you could try a direct findById if interviewId *could* be an ObjectId,
-        // but current logs suggest it's always the UUID.
-        // For now, we'll consider it not found if roomLink doesn't match.
         return res.status(404).json({ message: `InterviewRoom associated with ID ${interviewId} not found via roomLink.` });
       }
       actualInterviewObjectId = interviewDocument._id; // This is the actual ObjectId
@@ -172,6 +183,15 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
     } else {
       console.log("No interview ID (UUID part) provided with results. Saving result without linking to a specific InterviewRoom.");
     }
+
+    // Auto-link resumeProfileId if user has an uploaded profile and not supplied
+    let effectiveResumeProfileId = resumeProfileId;
+    if (!effectiveResumeProfileId && req.user?.userId) {
+      const existingProfile = await ResumeProfile.findOne({ userId: req.user.userId }).select('_id');
+      if (existingProfile) {
+        effectiveResumeProfileId = existingProfile._id;
+      }
+    }
     
     // Check if we already have results for this actualInterviewObjectId
     if (actualInterviewObjectId) {
@@ -187,6 +207,13 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
       interviewId: actualInterviewObjectId, // Use the actual ObjectId here
       jobRole,
       experienceLevel,
+      interviewMode,
+      difficulty,
+      duration,
+      resumeProfileId: effectiveResumeProfileId,
+      codeSubmissions,
+      rubricBreakdown,
+      suggestedTopicsToRevise,
       totalScore,
       feedback,
       strengths,
@@ -214,7 +241,6 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
         console.log("Updated interview with result reference");
       } catch (updateError) {
         console.error("Error updating interview with result reference:", updateError);
-        // Continue processing even if this fails
       }
     }
     
