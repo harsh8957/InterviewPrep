@@ -10,6 +10,8 @@ import { TestCase } from '../../lib/models/TestCase';
 import { RoadmapNode } from '../../lib/models/RoadmapNode';
 import { Assessment } from '../../lib/models/Assessment';
 import { Submission } from '../../lib/models/Submission';
+import { CompanyTrack } from '../../lib/models/CompanyTrack';
+import { CompanyExperience } from '../../lib/models/CompanyExperience';
 import {
   validateBody,
   createBlogSchema,
@@ -39,6 +41,10 @@ router.get('/stats', async (req, res) => {
       roadmaps: await RoadmapNode.countDocuments(),
       assessments: await Assessment.countDocuments(),
       submissions: await Submission.countDocuments(),
+      companyTracks: await CompanyTrack.countDocuments(),
+      experiences: await CompanyExperience.countDocuments(),
+      pendingExperiences: await CompanyExperience.countDocuments({ moderationStatus: 'pending' }),
+      reportedExperiences: await CompanyExperience.countDocuments({ 'reports.0': { $exists: true } }),
     };
     res.json(stats);
   } catch (error) {
@@ -310,6 +316,146 @@ router.post('/policies', async (req, res) => {
     res.status(201).json(policy);
   } catch (error) {
     res.status(500).json({ message: 'Error updating policy' });
+  }
+});
+
+// ==================== INTERVIEW EXPERIENCE MODERATION ====================
+
+// List experiences for moderation review
+router.get('/experiences', async (req, res) => {
+  try {
+    const { status, hasReports, page = '1', limit = '20' } = req.query;
+    const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string, 10) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
+    const filter: Record<string, any> = {};
+    if (status && typeof status === 'string' && status !== 'all') {
+      filter.moderationStatus = status;
+    }
+    if (hasReports === 'true') {
+      filter['reports.0'] = { $exists: true };
+    }
+
+    const [total, pendingCount, reportedCount, experiences] = await Promise.all([
+      CompanyExperience.countDocuments(filter),
+      CompanyExperience.countDocuments({ moderationStatus: 'pending' }),
+      CompanyExperience.countDocuments({ 'reports.0': { $exists: true } }),
+      CompanyExperience.find(filter)
+        .populate('author', 'firstName lastName email')
+        .populate('moderatedBy', 'firstName lastName email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+    ]);
+
+    res.json({
+      success: true,
+      total,
+      pendingCount,
+      reportedCount,
+      page: pageNum,
+      totalPages: Math.ceil(total / limitNum),
+      experiences,
+    });
+  } catch (error) {
+    console.error('Admin error fetching experiences:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch experiences for moderation' });
+  }
+});
+
+// Moderate experience: approve or reject
+router.put('/experiences/:id/moderate', async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { action, rejectionReason, notes } = req.body;
+
+    if (!action || !['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ success: false, message: "Action must be 'approve' or 'reject'" });
+    }
+
+    const experience = await CompanyExperience.findById(id);
+    if (!experience) {
+      return res.status(404).json({ success: false, message: 'Experience not found' });
+    }
+
+    const adminUserId = req.user!.userId;
+    experience.moderationStatus = action === 'approve' ? 'approved' : 'rejected';
+    experience.moderatedBy = adminUserId as any;
+    experience.moderatedAt = new Date();
+    if (action === 'reject') {
+      experience.rejectionReason = rejectionReason || 'Content does not meet publication standards';
+    } else {
+      experience.rejectionReason = undefined;
+    }
+
+    experience.moderationHistory.push({
+      action: action === 'approve' ? 'approved' : 'rejected',
+      performedBy: adminUserId as any,
+      timestamp: new Date(),
+      notes: notes || `Moderator marked as ${experience.moderationStatus}`,
+    });
+
+    await experience.save();
+
+    res.json({
+      success: true,
+      message: `Experience successfully ${experience.moderationStatus}`,
+      experience,
+    });
+  } catch (error) {
+    console.error('Error moderating experience:', error);
+    res.status(500).json({ success: false, message: 'Failed to moderate experience' });
+  }
+});
+
+// Admin edit content: remove or sanitize inappropriate sections
+router.put('/experiences/:id/content', async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { preparationTips, timelineNotes, notes } = req.body;
+
+    const experience = await CompanyExperience.findById(id);
+    if (!experience) {
+      return res.status(404).json({ success: false, message: 'Experience not found' });
+    }
+
+    if (preparationTips) experience.preparationTips = preparationTips;
+    if (timelineNotes !== undefined) experience.timelineNotes = timelineNotes;
+
+    experience.moderationHistory.push({
+      action: 'edited',
+      performedBy: req.user!.userId as any,
+      timestamp: new Date(),
+      notes: notes || 'Admin content redaction / edit',
+    });
+
+    await experience.save();
+
+    res.json({
+      success: true,
+      message: 'Experience content updated by moderator',
+      experience,
+    });
+  } catch (error) {
+    console.error('Error editing experience content:', error);
+    res.status(500).json({ success: false, message: 'Failed to edit experience content' });
+  }
+});
+
+// Admin delete experience
+router.delete('/experiences/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const experience = await CompanyExperience.findByIdAndDelete(id);
+    if (!experience) {
+      return res.status(404).json({ success: false, message: 'Experience not found' });
+    }
+    res.json({ success: true, message: 'Experience permanently removed by admin' });
+  } catch (error) {
+    console.error('Error deleting experience:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete experience' });
   }
 });
 

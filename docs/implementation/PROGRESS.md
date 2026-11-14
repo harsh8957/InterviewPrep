@@ -1,8 +1,8 @@
 # InterviewPrep — Implementation Progress & Tracking
 
 **Repository:** `D:\InterviewPrep\InterviewPrep`
-**Current Phase:** Phase 6 — Advanced AI Interviewer & Resume-Based Preparation
-**Status:** **PHASE 6 FULLY COMPLETED & VERIFIED** (Ready for User Acceptance)
+**Current Phase:** Phase 7 — Company Tracks & Interview Experiences
+**Status:** **PHASE 7 FULLY COMPLETED & VERIFIED** (Ready for User Acceptance)
 **Last Updated:** 2026-11-14
 
 ---
@@ -17,7 +17,7 @@
 | **Phase 4** | Online Coding Judge & Timed Assessments | **COMPLETED** | 2026-11-13 |
 | **Phase 5** | Core CS & System Design Modules | **COMPLETED** | 2026-11-14 |
 | **Phase 6** | Code-Aware & Resume-Driven AI Mock Interviews | **COMPLETED** | 2026-11-14 |
-| **Phase 7** | Company-Specific Prep Tracks & Experiences | PENDING | — |
+| **Phase 7** | Company-Specific Prep Tracks & Experiences | **COMPLETED** | 2026-11-14 |
 | **Phase 8** | Progress Analytics, Bookmarks & Profiles | PENDING | — |
 | **Phase 9** | Security Hardening, Performance & Deployment Readiness | PENDING | — |
 
@@ -167,6 +167,30 @@
    - Code History: Integrated Submitted Code Solutions drawer showing syntax-styled snippets, execution verdicts, and runtimes.
    - Curriculum Reconnection: Recommended revision topics linked directly to `/roadmap`, `/problems`, and `/core-cs`.
 
+### 2.9 Company Preparation Tracks & Interview Experiences (Phase 7)
+1. **Company Preparation Tracks Architecture:**
+   - Database Model: `CompanyTrack` (`name`, `slug`, `tier`, `description`, `headquarters`, `website`, `hiringBarOverview`, `culturePrinciples`, `targetRoles`, `rounds`, `linkedProblemIds`, `linkedSystemDesignIds`, `linkedBehavioralIds`, `linkedAssessmentIds`, `coreCsTopics`, `status`, `stats`).
+   - Clean Relational References: Problems, System Design cases, Behavioral questions, and Assessments are referenced strictly via MongoDB ObjectIds, preventing duplicate problem records.
+   - Seeded 6 Major Tracks: Google (L3/L4/L5, GCA/RRK hiring bar), Amazon (SDE I/II, 16 Leadership Principles), Meta (E4/E5, speed problem solving & real-time messaging), Microsoft (SDE 1/2, growth mindset & cloud patterns), Uber (real-time dispatch & concurrency), and Stripe (pragmatic code & ledger idempotency).
+2. **Community Interview Experience Platform:**
+   - Database Model: `CompanyExperience` (`companyName`, `companySlug`, `companyTrackId`, `author`, `candidateHandle`, `isAnonymous`, `role`, `experienceLevel`, `interviewYear`, `interviewSeason`, `difficulty`, `outcome`, `provenance`, `rounds[]`, `questions[]`, `preparationTips`, `timelineNotes`, `moderationStatus`, `reports[]`, `moderationHistory[]`).
+   - Moderation Lifecycle: New submissions automatically start in `pending` review. Only approved experiences are surfaced on the public feed and company track pages.
+   - Candidate Visibility: Authors can review their own pending or rejected submissions with rejection notes at `GET /api/experiences/my/submissions` and `GET /api/experiences/:id`.
+3. **PII Protection & Abuse Prevention:**
+   - Automated PII Scanner: `moderationService.ts` checks for phone numbers (domestic & international regex), personal email addresses, interviewer/recruiter personal names, and government IDs. Submissions with PII violations are rejected with `HTTP 400` and specific itemized violation messages.
+   - Rate Limiting: Max 5 experience submissions per user per 24 hours.
+   - Content Reporting: Authenticated users can flag inappropriate experiences, instantly surfacing them on the administrator moderation queue.
+4. **Administrator Moderation Console:**
+   - Queue Management: `GET /api/admin/experiences` with status filtering (`pending`, `approved`, `rejected`, `hasReports`).
+   - Decisions & Audit Trail: `PUT /api/admin/experiences/:id/moderate` for 1-click approvals or rejections with candidate feedback and immutable audit history.
+5. **Interactive UI Workspaces:**
+   - Company Track Catalog (`/companies`): Search, tier filtering (`All`, `FAANG & Tier 1`, `Enterprise SaaS`, `High-Growth Tech`, `FinTech`), role tags, and direct track links.
+   - Company Track Workspace (`/companies/:slug`): 6 tabbed views: Hiring Process & Culture, Linked DSA Coding, System Design Cases, Core CS & Behavioral, Timed Assessments, and Approved Community Loops.
+   - Experiences Feed (`/experiences`): Multi-filter feed by company, role, difficulty, outcome, and interview year.
+   - Experience Detail (`/experiences/:id`): Full debrief view with round-by-round breakdown, questions asked (with workspace solve buttons), advice quote, and report modal.
+   - Experience Submission Form (`/experiences/new`): Dynamic rounds builder, question builder, anonymity toggle, and real-time PII validation.
+   - Admin Moderation Page (`/admin/experiences`): Dedicated review queue for platform administrators.
+
 ---
 
 ## 3. Changed Files Log
@@ -275,6 +299,21 @@
 | `frontend/src/pages/SetupPage.tsx` | Interactive setup interface with 7 interview mode cards, role/difficulty/duration selectors, and resume upload dropzone. |
 | `frontend/src/pages/InterviewPage.tsx` | Split-screen interview room with verbal text and Monaco code editor tabs, live judge execution, and adaptive difficulty indicator. |
 | `frontend/src/pages/ResultDetailPage.tsx` | Upgraded results page with educational disclaimer, mode badges, 6-dimension rubric meters, code solution drawer, and revision topic links. |
+| `backend/src/lib/models/CompanyTrack.ts` | Schema for company preparation tracks, target roles, interview rounds, and linked references. |
+| `backend/src/lib/models/CompanyExperience.ts` | Schema for candidate interview loop debriefs, round stages, questions, moderation state, and reports. |
+| `backend/src/services/moderationService.ts` | PII detection service validating content against phone numbers, emails, and interviewer personal names. |
+| `backend/src/server/routes/companyTracks.ts` | Public catalog, detailed track view with populated references, and admin CRUD endpoints. |
+| `backend/src/server/routes/experiences.ts` | Public approved feed, candidate submission with PII validation, author submission views, and reporting. |
+| `backend/src/scripts/seedCompanyTracks.ts` | Seeder populating 6 top company tracks (Google, Amazon, Meta, Microsoft, Uber, Stripe) and approved sample loops. |
+| `backend/tests/companyTracks.test.ts` | Automated test suite covering PII validation, track relationships, pending visibility, and admin moderation. |
+| `frontend/src/pages/CompaniesPage.tsx` | Catalog of company preparation tracks with tier filter tabs, live metrics, and role tags. |
+| `frontend/src/pages/CompanyDetailPage.tsx` | Comprehensive track workspace with 6 tabbed views for hiring bar, DSA, system design, CS, and loops. |
+| `frontend/src/pages/ExperiencesPage.tsx` | Filterable and searchable feed of approved community interview loops. |
+| `frontend/src/pages/ExperienceDetailPage.tsx` | Detailed interview debrief view with round-by-round breakdown, questions asked, and reporting modal. |
+| `frontend/src/pages/ExperienceSubmitPage.tsx` | Dynamic submission form for interview loops with real-time PII validation and anonymity options. |
+| `frontend/src/pages/AdminExperiencesPage.tsx` | Administrator governance console for reviewing, approving, rejecting, and handling reported loops. |
+| `frontend/src/components/workspace/AppShell.tsx` | Updated sidebar navigation with Company Tracks, Interview Loops, and Admin Moderation. |
+| `frontend/src/App.tsx` | Configured routes for `/companies/:slug`, `/experiences`, `/experiences/new`, `/experiences/:id`, and `/admin/experiences`. |
 
 ---
 
@@ -282,15 +321,16 @@
 
 | Suite | Checks Run | Passed | Failed | Key Verification Results |
 | :--- | :--- | :--- | :--- | :--- |
-| **Frontend TypeScript Compile** | `npx tsc --noEmit` | **PASS** | 0 | Exit code 0, zero TypeScript errors across all workspace components and routes. |
-| **Frontend Production Build** | `npm run build` (`vite`) | **PASS** | 0 | Built 70+ chunks with Monaco editor, Mermaid.js integration, clean lazy loading, and zero fatal errors. |
+| **Frontend TypeScript Compile** | `npx tsc --noEmit` | **PASS** | 0 | Exit code 0, zero TypeScript errors across all company track and experience components. |
+| **Frontend Production Build** | `npm run build` (`vite`) | **PASS** | 0 | Built 80+ chunks with clean lazy loading and zero fatal errors. |
 | **Frontend Lint** | `npm run lint` (`eslint`) | **PASS** | 0 | Exit code 0, 0 errors across all frontend files. |
 | **Backend TypeScript Compile** | `npx tsc --noEmit` | **PASS** | 0 | Exit code 0, zero TypeScript errors across all models, routers, and services. |
 | **Backend Production Build** | `npm run build` (`tsc -p tsconfig.json`) | **PASS** | 0 | Built cleanly to `dist/` with zero compiler errors. |
+| **Backend Phase 7 Company & Experiences** | `tests/companyTracks.test.ts` | **17** | **0** | Verified PII regex scanner, track catalog, pending experience isolation, candidate author access, admin moderation, and cross-user edit rejection. |
 | **Backend Phase 6 AI & Resume Suite** | `tests/interviewPhase6.test.ts` | **14** | **0** | Verified PDF magic byte validation, prompt injection quarantine, resume CRUD IDOR isolation, 7 interview modes, code-aware rubric evaluation, and result persistence. |
 | **Backend Core CS & System Design** | `vitest run tests/coreCS.test.ts` | **19** | **0** | All 19 Phase 5 automated tests pass (confidentiality, server grading, system design drafts, IDOR story CRUD). |
 | **Backend Judge & Execution Suite** | `vitest run tests/judge.test.ts` | **11** | **0** | All 11 Phase 4 judge tests pass (AC, WA, TLE, CE, RE, confidentiality, rate limiting). |
 | **Backend Assessment Suite** | `vitest run tests/assessment.test.ts` | **7** | **0** | All 7 Phase 4 assessment tests pass (start, resume, late expiry 403, scorecard). |
 | **Backend DSA API Suite** | `vitest run tests/dsa.test.ts` | **13** | **0** | All 13 Phase 3 automated unit & integration tests pass (roadmaps, problem catalog, confidentiality, admin CRUD). |
 | **Backend Security Regression** | `vitest run tests/security.test.ts` | **8** | **0** | All 8 Phase 1 security regression tests continue to pass. |
-| **Total Backend Test Coverage** | Vitest test suites (all 6 suites) | **72** | **0** | **72 passing tests, 0 failures, 0 regressions.** |
+| **Total Backend Test Coverage** | Vitest test suites (all 7 suites) | **89** | **0** | **89 passing tests, 0 failures, 0 regressions.** |

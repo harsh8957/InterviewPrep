@@ -37,6 +37,11 @@ const CoreCSPage = lazy(() => import('./pages/CoreCSPage'));
 const SystemDesignPage = lazy(() => import('./pages/SystemDesignPage'));
 const SystemDesignWorkspacePage = lazy(() => import('./pages/SystemDesignWorkspacePage'));
 const CompaniesPage = lazy(() => import('./pages/CompaniesPage'));
+const CompanyDetailPage = lazy(() => import('./pages/CompanyDetailPage'));
+const ExperiencesPage = lazy(() => import('./pages/ExperiencesPage'));
+const ExperienceDetailPage = lazy(() => import('./pages/ExperienceDetailPage'));
+const ExperienceSubmitPage = lazy(() => import('./pages/ExperienceSubmitPage'));
+const AdminExperiencesPage = lazy(() => import('./pages/AdminExperiencesPage'));
 const SetupPage = lazy(() => import('./pages/SetupPage'));
 const InterviewPage = lazy(() => import('./pages/InterviewPage'));
 const ResultsPage = lazy(() => import('./pages/ResultsPage'));
@@ -219,6 +224,38 @@ const App: React.FC = () => {
                 }
               />
               <Route
+                path="companies/:slug"
+                element={
+                  <ProtectedRoute allowedRoles={['candidate', 'admin']}>
+                    <CompanyDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="experiences"
+                element={
+                  <ProtectedRoute allowedRoles={['candidate', 'admin']}>
+                    <ExperiencesPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="experiences/new"
+                element={
+                  <ProtectedRoute allowedRoles={['candidate', 'admin']}>
+                    <ExperienceSubmitPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="experiences/:id"
+                element={
+                  <ProtectedRoute allowedRoles={['candidate', 'admin']}>
+                    <ExperienceDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="setup"
                 element={
                   <ProtectedRoute allowedRoles={['candidate', 'admin']}>
@@ -260,6 +297,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <AdminDashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="admin/experiences"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AdminExperiencesPage />
                   </ProtectedRoute>
                 }
               />

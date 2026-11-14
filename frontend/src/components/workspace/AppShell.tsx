@@ -95,6 +95,7 @@ export const AppShell: React.FC<{ children?: React.ReactNode }> = ({ children })
           title: 'Management',
           items: [
             { to: '/admin/dashboard', label: 'Admin Console', icon: Shield },
+            { to: '/admin/experiences', label: 'Experience Moderation', icon: Building2, badge: 'Review' },
             { to: '/results', label: 'Candidate Results', icon: CheckCircle2 },
           ]
         },
@@ -158,7 +159,8 @@ export const AppShell: React.FC<{ children?: React.ReactNode }> = ({ children })
           { to: '/assessments', label: 'Coding Assessments', icon: FileCode2, badge: 'Live', badgeVariant: 'secondary' },
           { to: '/core-cs', label: 'Core CS Subjects', icon: Cpu, badge: 'Live', badgeVariant: 'secondary' },
           { to: '/system-design', label: 'System Design', icon: Boxes, badge: 'Live', badgeVariant: 'secondary' },
-          { to: '/companies', label: 'Company Guides', icon: Building2, badge: 'Phase 7', badgeVariant: 'outline' },
+          { to: '/companies', label: 'Company Tracks', icon: Building2, badge: 'Live', badgeVariant: 'secondary' },
+          { to: '/experiences', label: 'Interview Loops', icon: Users, badge: 'Live', badgeVariant: 'secondary' },
         ]
       },
       {

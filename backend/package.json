@@ -10,7 +10,8 @@
     "test": "vitest run",
     "create-admin": "tsx src/scripts/createAdmin.ts",
     "seed:dsa": "tsx src/scripts/seedDSA.ts",
-    "seed:core-cs": "tsx src/scripts/seedCoreCS.ts"
+    "seed:core-cs": "tsx src/scripts/seedCoreCS.ts",
+    "seed:companies": "tsx src/scripts/seedCompanyTracks.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

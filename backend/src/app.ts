@@ -19,6 +19,8 @@ import assessmentRoutes from './server/routes/assessments';
 import coreCSRoutes from './server/routes/coreCS';
 import systemDesignRoutes from './server/routes/systemDesign';
 import behavioralRoutes from './server/routes/behavioral';
+import companyTrackRoutes from './server/routes/companyTracks';
+import experienceRoutes from './server/routes/experiences';
 
 export const app = express();
 
@@ -49,6 +51,8 @@ app.use('/api/assessments', assessmentRoutes);
 app.use('/api/core-cs', coreCSRoutes);
 app.use('/api/system-design', systemDesignRoutes);
 app.use('/api/behavioral', behavioralRoutes);
+app.use('/api/company-tracks', companyTrackRoutes);
+app.use('/api/experiences', experienceRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
