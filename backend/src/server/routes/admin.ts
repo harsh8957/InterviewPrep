@@ -8,6 +8,8 @@ import { CompanyInfo, TeamMember } from '../../lib/models/CompanyInfo';
 import { Problem } from '../../lib/models/Problem';
 import { TestCase } from '../../lib/models/TestCase';
 import { RoadmapNode } from '../../lib/models/RoadmapNode';
+import { Assessment } from '../../lib/models/Assessment';
+import { Submission } from '../../lib/models/Submission';
 import {
   validateBody,
   createBlogSchema,
@@ -15,6 +17,8 @@ import {
   updateProblemSchema,
   createRoadmapSchema,
   updateRoadmapSchema,
+  createAssessmentSchema,
+  updateAssessmentSchema,
 } from '../../lib/validation';
 
 const router = express.Router();
@@ -33,6 +37,8 @@ router.get('/stats', async (req, res) => {
       team: await TeamMember.countDocuments(),
       problems: await Problem.countDocuments(),
       roadmaps: await RoadmapNode.countDocuments(),
+      assessments: await Assessment.countDocuments(),
+      submissions: await Submission.countDocuments(),
     };
     res.json(stats);
   } catch (error) {
@@ -206,6 +212,63 @@ router.delete('/roadmaps/:id', async (req: AuthRequest, res) => {
     res.json({ message: 'Roadmap node deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting roadmap node' });
+  }
+});
+
+// ==================== ASSESSMENT MANAGEMENT ====================
+
+// List all assessments
+router.get('/assessments', async (req, res) => {
+  try {
+    const assessments = await Assessment.find()
+      .populate('problemIds', 'title slug difficulty')
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json(assessments);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching assessments' });
+  }
+});
+
+// Create Assessment
+router.post('/assessments', validateBody(createAssessmentSchema), async (req: AuthRequest, res) => {
+  try {
+    const existing = await Assessment.findOne({ slug: req.body.slug });
+    if (existing) {
+      return res.status(400).json({ message: `Assessment with slug '${req.body.slug}' already exists` });
+    }
+
+    const assessment = new Assessment(req.body);
+    await assessment.save();
+    res.status(201).json(assessment);
+  } catch (error) {
+    res.status(500).json({ message: 'Error creating assessment' });
+  }
+});
+
+// Update Assessment
+router.put('/assessments/:id', validateBody(updateAssessmentSchema), async (req: AuthRequest, res) => {
+  try {
+    const assessment = await Assessment.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!assessment) {
+      return res.status(404).json({ message: 'Assessment not found' });
+    }
+    res.json(assessment);
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating assessment' });
+  }
+});
+
+// Delete Assessment
+router.delete('/assessments/:id', async (req: AuthRequest, res) => {
+  try {
+    const assessment = await Assessment.findByIdAndDelete(req.params.id);
+    if (!assessment) {
+      return res.status(404).json({ message: 'Assessment not found' });
+    }
+    res.json({ message: 'Assessment deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting assessment' });
   }
 });
 

@@ -14,6 +14,8 @@ import resumeRoutes from './server/routes/resume';
 import adminRoutes from './server/routes/admin';
 import roadmapRoutes from './server/routes/roadmaps';
 import problemRoutes from './server/routes/problems';
+import submissionRoutes from './server/routes/submissions';
+import assessmentRoutes from './server/routes/assessments';
 
 export const app = express();
 
@@ -39,6 +41,8 @@ app.use('/api/resume', resumeRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/roadmaps', roadmapRoutes);
 app.use('/api/problems', problemRoutes);
+app.use('/api/submissions', submissionRoutes);
+app.use('/api/assessments', assessmentRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

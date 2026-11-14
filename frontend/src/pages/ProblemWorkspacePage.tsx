@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import {
@@ -19,6 +19,11 @@ import {
   HelpCircle,
   Sparkles,
   Info,
+  CheckCircle2,
+  XCircle,
+  History,
+  Terminal,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -57,6 +62,35 @@ interface ProblemDetail {
   }[];
 }
 
+interface TestCaseResult {
+  testCaseId?: string;
+  passed: boolean;
+  verdict: string;
+  runtimeMs: number;
+  memoryKb: number;
+  stdin?: string;
+  expectedStdout?: string;
+  actualStdout?: string;
+  errorOutput?: string;
+  isHidden?: boolean;
+}
+
+interface SubmissionResponse {
+  _id: string;
+  verdict: string;
+  passedCount: number;
+  totalCount: number;
+  runtimeMs: number;
+  memoryKb: number;
+  compileOutput?: string;
+  error?: string;
+  isSampleRun: boolean;
+  testCaseResults: TestCaseResult[];
+  createdAt: string;
+  language: string;
+  sourceCode?: string;
+}
+
 const LANGUAGE_CONFIG: Record<SupportedLanguage, { label: string; monacoLang: string; defaultSnippet: string }> = {
   python: {
     label: 'Python 3',
@@ -91,7 +125,7 @@ export const ProblemWorkspacePage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'description' | 'hints' | 'editorial' | 'testcases'>('description');
+  const [activeTab, setActiveTab] = useState<'description' | 'hints' | 'editorial' | 'testcases' | 'results' | 'submissions'>('description');
   const [revealedHints, setRevealedHints] = useState<Record<number, boolean>>({});
 
   const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage>('python');
@@ -100,6 +134,14 @@ export const ProblemWorkspacePage: React.FC = () => {
   const [code, setCode] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
+
+  // Execution & Judge State
+  const [isExecuting, setIsExecuting] = useState<boolean>(false);
+  const [executionType, setExecutionType] = useState<'sample' | 'submit' | null>(null);
+  const [lastSubmission, setLastSubmission] = useState<SubmissionResponse | null>(null);
+  const [submissionHistory, setSubmissionHistory] = useState<SubmissionResponse[]>([]);
+  const [historyLoading, setHistoryLoading] = useState<boolean>(false);
+  const [executionError, setExecutionError] = useState<string | null>(null);
 
   const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -143,6 +185,30 @@ export const ProblemWorkspacePage: React.FC = () => {
     }
   }, [problem, slug, selectedLanguage]);
 
+  // Fetch submission history
+  const fetchSubmissionHistory = useCallback(() => {
+    if (!problem) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    setHistoryLoading(true);
+    fetch(`${API_URL}/api/submissions/problem/${problem._id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: SubmissionResponse[]) => {
+        setSubmissionHistory(data);
+        setHistoryLoading(false);
+      })
+      .catch(() => setHistoryLoading(false));
+  }, [problem, API_URL]);
+
+  useEffect(() => {
+    if (activeTab === 'submissions') {
+      fetchSubmissionHistory();
+    }
+  }, [activeTab, fetchSubmissionHistory]);
+
   // Handle Code Change with Debounced LocalStorage Sync
   const handleCodeChange = (newCode?: string) => {
     const updated = newCode ?? '';
@@ -180,6 +246,95 @@ export const ProblemWorkspacePage: React.FC = () => {
 
   const toggleHint = (index: number) => {
     setRevealedHints((prev) => ({ ...prev, [index]: !prev[index] }));
+  };
+
+  // Run Sample Tests
+  const handleRunTests = async () => {
+    if (!problem || isExecuting) return;
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setExecutionError('Please sign in to execute code.');
+      return;
+    }
+
+    setIsExecuting(true);
+    setExecutionType('sample');
+    setExecutionError(null);
+    setActiveTab('results');
+
+    try {
+      const res = await fetch(`${API_URL}/api/submissions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          problemId: problem._id,
+          language: selectedLanguage,
+          sourceCode: code,
+          isSampleRun: true,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Execution error');
+      }
+
+      const result: SubmissionResponse = await res.json();
+      setLastSubmission(result);
+    } catch (err: any) {
+      setExecutionError(err.message || 'Network error executing code');
+    } finally {
+      setIsExecuting(false);
+      setExecutionType(null);
+    }
+  };
+
+  // Submit Final Solution
+  const handleSubmitSolution = async () => {
+    if (!problem || isExecuting) return;
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setExecutionError('Please sign in to submit solutions.');
+      return;
+    }
+
+    setIsExecuting(true);
+    setExecutionType('submit');
+    setExecutionError(null);
+    setActiveTab('results');
+
+    try {
+      const res = await fetch(`${API_URL}/api/submissions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          problemId: problem._id,
+          language: selectedLanguage,
+          sourceCode: code,
+          isSampleRun: false,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Submission error');
+      }
+
+      const result: SubmissionResponse = await res.json();
+      setLastSubmission(result);
+      fetchSubmissionHistory();
+    } catch (err: any) {
+      setExecutionError(err.message || 'Network error submitting code');
+    } finally {
+      setIsExecuting(false);
+      setExecutionType(null);
+    }
   };
 
   const difficultyBadge = useMemo(() => {
@@ -259,7 +414,7 @@ export const ProblemWorkspacePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Phase 4 Boundary Notice & Draft Status */}
+        {/* Phase 4 Live Execution & Draft Status */}
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-muted/60 text-muted-foreground border border-border">
             <span
@@ -271,17 +426,16 @@ export const ProblemWorkspacePage: React.FC = () => {
             <span>{saveStatus === 'saved' ? 'Draft autosaved' : 'Saving...'}</span>
           </div>
 
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
             <Sparkles size={13} />
-            <span className="hidden md:inline">Phase 3 Interactive IDE</span>
-            <span className="md:hidden">Phase 3</span>
+            <span>Judge0 CE Online</span>
           </div>
         </div>
       </div>
 
       {/* Main Workspace Split Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[680px]">
-        {/* Left Panel: Problem Specification, Hints, Editorial */}
+        {/* Left Panel: Problem Specification, Hints, Editorial, Live Results, Submissions */}
         <div className="lg:col-span-5 flex flex-col bg-card rounded-2xl border border-border overflow-hidden shadow-sm">
           {/* Tab Navigation */}
           <div className="flex items-center border-b border-border bg-muted/40 px-3 pt-2 gap-1 overflow-x-auto text-xs font-medium">
@@ -331,7 +485,31 @@ export const ProblemWorkspacePage: React.FC = () => {
               )}
             >
               <HelpCircle size={14} />
-              Examples
+              Cases
+            </button>
+            <button
+              onClick={() => setActiveTab('results')}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-2 rounded-t-lg border-b-2 transition-all',
+                activeTab === 'results'
+                  ? 'border-primary text-foreground bg-card font-semibold'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Terminal size={14} />
+              Results {lastSubmission && `(${lastSubmission.verdict})`}
+            </button>
+            <button
+              onClick={() => setActiveTab('submissions')}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-2 rounded-t-lg border-b-2 transition-all',
+                activeTab === 'submissions'
+                  ? 'border-primary text-foreground bg-card font-semibold'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <History size={14} />
+              Submissions
             </button>
           </div>
 
@@ -453,6 +631,213 @@ export const ProblemWorkspacePage: React.FC = () => {
               </div>
             )}
 
+            {/* Live Execution Results Tab */}
+            {activeTab === 'results' && (
+              <div className="space-y-4 animate-fade-in">
+                <div className="flex items-center justify-between pb-2 border-b border-border">
+                  <h3 className="font-bold text-foreground text-sm flex items-center gap-2">
+                    <Terminal size={15} />
+                    <span>Execution Output</span>
+                  </h3>
+                  {lastSubmission && (
+                    <span
+                      className={cn(
+                        'px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider',
+                        lastSubmission.verdict === 'AC'
+                          ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                          : lastSubmission.verdict === 'WA'
+                          ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                          : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                      )}
+                    >
+                      {lastSubmission.verdict === 'AC' ? 'Accepted' : lastSubmission.verdict}
+                    </span>
+                  )}
+                </div>
+
+                {isExecuting ? (
+                  <div className="p-10 text-center space-y-3">
+                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+                    <p className="text-xs text-muted-foreground font-medium">
+                      {executionType === 'sample' ? 'Executing against sample test cases...' : 'Evaluating against public & hidden test suite...'}
+                    </p>
+                  </div>
+                ) : executionError ? (
+                  <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs space-y-2">
+                    <div className="font-semibold flex items-center gap-1.5">
+                      <AlertCircle size={15} />
+                      <span>Execution Error</span>
+                    </div>
+                    <p>{executionError}</p>
+                    <button
+                      onClick={executionType === 'sample' ? handleRunTests : handleSubmitSolution}
+                      className="btn btn-outline btn-xs mt-2"
+                    >
+                      Retry Execution
+                    </button>
+                  </div>
+                ) : !lastSubmission ? (
+                  <div className="p-8 text-center text-xs text-muted-foreground">
+                    Click <strong>"Run Tests"</strong> to test sample cases, or <strong>"Submit"</strong> to run formal assessment.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Metrics Banner */}
+                    <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-muted/40 border border-border text-center text-xs">
+                      <div>
+                        <div className="text-[10px] text-muted-foreground uppercase font-semibold">Passed Cases</div>
+                        <div className="font-bold text-foreground">
+                          {lastSubmission.passedCount} / {lastSubmission.totalCount}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-muted-foreground uppercase font-semibold">Runtime</div>
+                        <div className="font-bold text-foreground">{lastSubmission.runtimeMs} ms</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-muted-foreground uppercase font-semibold">Memory</div>
+                        <div className="font-bold text-foreground">
+                          {Math.round(lastSubmission.memoryKb / 1024)} MB
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Compilation Error Details */}
+                    {lastSubmission.compileOutput && (
+                      <div className="space-y-1.5">
+                        <span className="text-xs font-semibold text-rose-500">Compilation Error</span>
+                        <pre className="p-3 rounded-xl bg-black/80 text-rose-300 font-mono text-xs overflow-x-auto whitespace-pre-wrap">
+                          {lastSubmission.compileOutput}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Individual Test Cases */}
+                    <div className="space-y-2.5">
+                      {lastSubmission.testCaseResults?.map((tc, idx) => (
+                        <div
+                          key={idx}
+                          className={cn(
+                            'p-3 rounded-xl border text-xs font-mono space-y-1.5',
+                            tc.passed ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'
+                          )}
+                        >
+                          <div className="flex items-center justify-between font-sans text-xs">
+                            <span className="font-bold text-foreground flex items-center gap-1.5">
+                              {tc.passed ? (
+                                <CheckCircle2 size={14} className="text-emerald-500" />
+                              ) : (
+                                <XCircle size={14} className="text-rose-500" />
+                              )}
+                              <span>Test Case {idx + 1} {tc.isHidden ? '(Confidential)' : ''}</span>
+                            </span>
+                            <span
+                              className={cn(
+                                'font-semibold text-[11px]',
+                                tc.passed ? 'text-emerald-500' : 'text-rose-500'
+                              )}
+                            >
+                              {tc.verdict} ({tc.runtimeMs}ms)
+                            </span>
+                          </div>
+
+                          {!tc.isHidden ? (
+                            <div className="space-y-1 pt-1 text-[11px]">
+                              <div>
+                                <span className="text-muted-foreground font-semibold">Input: </span>
+                                <span className="text-foreground">{tc.stdin}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground font-semibold">Expected: </span>
+                                <span className="text-foreground">{tc.expectedStdout}</span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground font-semibold">Actual: </span>
+                                <span className="text-foreground">{tc.actualStdout || '<no output>'}</span>
+                              </div>
+                              {tc.errorOutput && (
+                                <div className="text-rose-500 text-[10px]">
+                                  <span>Error: </span>
+                                  {tc.errorOutput}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-muted-foreground italic text-[11px] pt-1">
+                              Inputs and outputs are hidden for this evaluation test case.
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Submissions History Tab */}
+            {activeTab === 'submissions' && (
+              <div className="space-y-4 animate-fade-in">
+                <div className="flex items-center justify-between pb-2 border-b border-border">
+                  <h3 className="font-bold text-foreground text-sm flex items-center gap-1.5">
+                    <History size={15} />
+                    <span>My Past Submissions</span>
+                  </h3>
+                  <button
+                    onClick={fetchSubmissionHistory}
+                    disabled={historyLoading}
+                    className="p-1 rounded text-muted-foreground hover:text-foreground"
+                    title="Refresh history"
+                  >
+                    <RefreshCw size={13} className={cn(historyLoading && 'animate-spin')} />
+                  </button>
+                </div>
+
+                {historyLoading ? (
+                  <div className="p-8 text-center text-xs text-muted-foreground">Loading submissions...</div>
+                ) : submissionHistory.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic p-4 text-center">
+                    No submissions recorded yet for this problem.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {submissionHistory.map((sub) => (
+                      <div
+                        key={sub._id}
+                        className="p-3 rounded-xl border border-border bg-muted/30 flex items-center justify-between text-xs hover:border-primary/40 transition-colors"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={cn(
+                                'font-bold uppercase text-[11px]',
+                                sub.verdict === 'AC' ? 'text-emerald-500' : 'text-rose-500'
+                              )}
+                            >
+                              {sub.verdict === 'AC' ? 'Accepted' : sub.verdict}
+                            </span>
+                            <span className="text-muted-foreground font-mono text-[11px]">
+                              ({sub.passedCount}/{sub.totalCount} passed)
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-muted-foreground flex items-center gap-2">
+                            <span className="capitalize">{sub.language}</span>
+                            <span>•</span>
+                            <span>{new Date(sub.createdAt).toLocaleString()}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-right text-xs font-mono text-muted-foreground">
+                          <div>{sub.runtimeMs}ms</div>
+                          <div>{Math.round(sub.memoryKb / 1024)}MB</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Hints Tab */}
             {activeTab === 'hints' && (
               <div className="space-y-4 animate-fade-in">
@@ -516,7 +901,7 @@ export const ProblemWorkspacePage: React.FC = () => {
               </div>
             )}
 
-            {/* Test Cases / Examples Tab */}
+            {/* Test Cases Tab */}
             {activeTab === 'testcases' && (
               <div className="space-y-4 animate-fade-in">
                 <div className="flex items-center justify-between pb-2 border-b border-border">
@@ -546,7 +931,7 @@ export const ProblemWorkspacePage: React.FC = () => {
                 <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400 flex items-start gap-2">
                   <Info size={16} className="shrink-0 mt-0.5" />
                   <span>
-                    Additional hidden edge cases evaluate your solution during formal Phase 4 assessment.
+                    Additional hidden edge cases evaluate your solution during formal assessment.
                   </span>
                 </div>
               </div>
@@ -554,7 +939,7 @@ export const ProblemWorkspacePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Panel: Monaco Editor & Controls */}
+        {/* Right Panel: Monaco Editor & Live Run/Submit Actions */}
         <div className="lg:col-span-7 flex flex-col bg-card rounded-2xl border border-border overflow-hidden shadow-sm">
           {/* Editor Header Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-muted/40 border-b border-border text-xs">
@@ -647,31 +1032,41 @@ export const ProblemWorkspacePage: React.FC = () => {
             />
           </div>
 
-          {/* Bottom Execution Bar with Phase 4 Boundary Notice */}
+          {/* Bottom Execution Bar with Real Actions */}
           <div className="p-3 bg-muted/40 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
               <span>
-                <strong>Phase 4 Boundary:</strong> Sandbox test runner & judge evaluation connect in Phase 4.
+                <strong>Isolated Sandbox:</strong> Code runs in a secure cgroups execution environment.
               </span>
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
               <button
-                disabled
-                title="Online execution runner connects in Phase 4"
-                className="btn btn-outline btn-sm flex items-center gap-1.5 opacity-60 cursor-not-allowed text-xs"
+                onClick={handleRunTests}
+                disabled={isExecuting}
+                className="btn btn-outline btn-sm flex items-center gap-1.5 text-xs font-semibold"
+                title="Run code against sample test cases"
               >
-                <Play size={13} />
+                {isExecuting && executionType === 'sample' ? (
+                  <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Play size={13} className="text-emerald-500" />
+                )}
                 <span>Run Tests</span>
               </button>
               <button
-                disabled
-                title="Submission evaluation connects in Phase 4"
-                className="btn btn-primary btn-sm flex items-center gap-1.5 opacity-60 cursor-not-allowed text-xs"
+                onClick={handleSubmitSolution}
+                disabled={isExecuting}
+                className="btn btn-primary btn-sm flex items-center gap-1.5 text-xs font-semibold"
+                title="Submit solution for full test evaluation"
               >
-                <Send size={13} />
-                <span>Submit</span>
+                {isExecuting && executionType === 'submit' ? (
+                  <div className="w-3.5 h-3.5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Send size={13} />
+                )}
+                <span>Submit Solution</span>
               </button>
             </div>
           </div>

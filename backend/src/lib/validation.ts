@@ -111,3 +111,31 @@ export const createRoadmapSchema = z.object({
 });
 
 export const updateRoadmapSchema = createRoadmapSchema.partial();
+
+// Submission Schemas
+export const createSubmissionSchema = z.object({
+  problemId: z.string().min(1, 'Problem ID is required'),
+  language: z.enum(['python', 'javascript', 'typescript', 'cpp', 'java'], {
+    message: 'Language must be python, javascript, typescript, cpp, or java',
+  }),
+  sourceCode: z.string().min(1, 'Source code cannot be empty').max(65536, 'Source code cannot exceed 64KB'),
+  isSampleRun: z.boolean().optional().default(false),
+  assessmentId: z.string().optional(),
+  attemptId: z.string().optional(),
+});
+
+// Assessment Schemas
+export const createAssessmentSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  slug: z.string().min(1, 'Slug is required'),
+  description: z.string().min(1, 'Description is required'),
+  instructions: z.array(z.string()).optional().default([]),
+  durationMinutes: z.number().int().min(5, 'Duration must be at least 5 minutes').max(300, 'Duration cannot exceed 5 hours'),
+  problemIds: z.array(z.string()).min(1, 'At least one problem is required'),
+  difficulty: z.enum(['easy', 'medium', 'hard']).optional().default('medium'),
+  passingScore: z.number().min(0).max(100).optional().default(70),
+  tags: z.array(z.string()).optional().default([]),
+  isPublished: z.boolean().optional().default(true),
+});
+
+export const updateAssessmentSchema = createAssessmentSchema.partial();

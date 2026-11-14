@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { Problem } from '../lib/models/Problem';
 import { RoadmapNode } from '../lib/models/RoadmapNode';
 import { TestCase } from '../lib/models/TestCase';
+import { Assessment } from '../lib/models/Assessment';
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/echoprep';
 
@@ -1051,7 +1052,76 @@ export async function seedDSA() {
     console.log(`  [Link] RoadmapNode '${slug}' linked with ${probIds.length} problems`);
   }
 
-  console.log('\n[SeedDSA] DSA Seed completed successfully!');
+  console.log('\n[SeedDSA] Seeding Sample Assessments...');
+  const twoSumProblem = await Problem.findOne({ slug: 'two-sum' });
+  const containerProblem = await Problem.findOne({ slug: 'container-with-most-water' });
+  const validParenthesesProblem = await Problem.findOne({ slug: 'valid-parentheses' });
+  const rotatedSearchProblem = await Problem.findOne({ slug: 'search-in-rotated-sorted-array' });
+  const longestSubstringProblem = await Problem.findOne({ slug: 'longest-substring-without-repeating-characters' });
+  const climbingStairsProblem = await Problem.findOne({ slug: 'climbing-stairs' });
+
+  const fullstackProblemIds = [
+    twoSumProblem?._id,
+    containerProblem?._id,
+    validParenthesesProblem?._id,
+  ].filter(Boolean);
+
+  const coreDsaProblemIds = [
+    rotatedSearchProblem?._id,
+    longestSubstringProblem?._id,
+    climbingStairsProblem?._id,
+  ].filter(Boolean);
+
+  await Assessment.findOneAndUpdate(
+    { slug: 'fullstack-swe-oa' },
+    {
+      $set: {
+        title: 'Full-Stack Software Engineer Online Assessment',
+        slug: 'fullstack-swe-oa',
+        description: 'Comprehensive 75-minute algorithmic assessment designed to simulate top-tier tech screening rounds.',
+        instructions: [
+          'Solve all 3 problems within the allotted 75 minutes.',
+          'Execution time and memory limits are strictly evaluated per problem.',
+          'Hidden test cases verify boundary edge cases and time complexities.',
+          'Submissions after authoritative server expiration will not be accepted.',
+        ],
+        durationMinutes: 75,
+        problemIds: fullstackProblemIds,
+        difficulty: 'medium',
+        passingScore: 70,
+        isPublished: true,
+        tags: ['Full-Stack', 'Arrays', 'Two Pointers', 'Stacks', 'FAANG OA'],
+      },
+    },
+    { upsert: true }
+  );
+  console.log('  [Assessment] Upserted: Full-Stack Software Engineer Online Assessment');
+
+  await Assessment.findOneAndUpdate(
+    { slug: 'core-dsa-oa' },
+    {
+      $set: {
+        title: 'Core Algorithms & Data Structures Assessment',
+        slug: 'core-dsa-oa',
+        description: 'Advanced 60-minute technical assessment covering Binary Search, Sliding Window, and Dynamic Programming.',
+        instructions: [
+          'Solve 3 algorithmic challenges requiring optimal O(log n) and O(n) complexities.',
+          'Each submission is tested against visible examples and hidden stress tests.',
+          'Passing threshold is 75% total score across all problems.',
+        ],
+        durationMinutes: 60,
+        problemIds: coreDsaProblemIds,
+        difficulty: 'hard',
+        passingScore: 75,
+        isPublished: true,
+        tags: ['Binary Search', 'Sliding Window', 'Dynamic Programming', 'Competitive'],
+      },
+    },
+    { upsert: true }
+  );
+  console.log('  [Assessment] Upserted: Core Algorithms & Data Structures Assessment');
+
+  console.log('\n[SeedDSA] DSA & Assessment Seed completed successfully!');
 }
 
 if (process.argv[1]?.endsWith('seedDSA.ts') || process.argv[1]?.endsWith('seedDSA.js')) {

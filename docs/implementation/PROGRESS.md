@@ -14,7 +14,7 @@
 | **Phase 1** | Security, Reliability & Bug Fixes | **COMPLETED** | 2026-11-13 |
 | **Phase 2** | UI/UX Redesign & Responsive Workspace Shell | **COMPLETED** | 2026-11-13 |
 | **Phase 3** | DSA Roadmap, Problem Bank & Coding Practice Workspace | **COMPLETED** | 2026-11-13 |
-| **Phase 4** | Online Coding Judge & Timed Assessments | PENDING | — |
+| **Phase 4** | Online Coding Judge & Timed Assessments | **COMPLETED** | 2026-11-13 |
 | **Phase 5** | Core CS & System Design Modules | PENDING | — |
 | **Phase 6** | Code-Aware & Resume-Driven AI Mock Interviews | PENDING | — |
 | **Phase 7** | Company-Specific Prep Tracks & Experiences | PENDING | — |
@@ -102,6 +102,19 @@
    - `ProblemsPage.tsx`: Live-connected to `GET /api/problems`, supporting search, topic selection, difficulty filtering, complexity indicators, company tags, and pagination.
    - `AdminDashboardPage.tsx`: Updated with live problem and roadmap statistics cards, problem bank table, and interactive "Create Problem" modal form.
 
+### 2.6 Secure Online Coding Judge & Timed Assessments (Phase 4)
+1. **Infrastructure Design & Documentation:** Documented online judge architecture in `docs/architecture/ONLINE_JUDGE_INFRASTRUCTURE.md`. Enforced strict security controls: zero untrusted code execution in Node/Express or FastAPI; no raw child processes; no Docker socket exposure. Created an extensible `IJudgeProvider` abstraction with production Judge0 CE REST client and deterministic `MockJudgeProvider` for testing all verdicts (`AC`, `WA`, `TLE`, `MLE`, `RE`, `CE`, `INTERNAL_ERROR`).
+2. **Master Judge Service & Queue Orchestration:** Implemented `backend/src/services/judge/judgeService.ts` featuring a bounded concurrency queue (max 5 parallel jobs), per-user submission rate limiter (5s rolling window with 429 throttling), test case fetching, execution timeout safeguards, and status normalization.
+3. **Confidentiality & Test Case Sanitization:** Guaranteed that hidden test inputs and expected outputs are never returned to clients or browser devtools. Public sample runs only evaluate non-hidden test cases; official submissions evaluate all cases with outputs sanitized.
+4. **Timed Assessments Engine:**
+   - Schemas: `Assessment` (duration, passing score, problem references) and `AssessmentAttempt` (authoritative server `startedAt`, `expiresAt`, status, tab-switch telemetry, scores).
+   - Authoritative Expiration: Backend strictly checks `now <= expiresAt` before accepting problem submissions or finalizing attempts, rejecting late submissions with `HTTP 403 Forbidden`.
+   - Proctored Telemetry: Tracks client visibility changes (`visibilitychange`) and records tab switches transparently.
+5. **Interactive Frontend Assessment & Submission Workspaces:**
+   - `ProblemWorkspacePage.tsx`: Connected live "Run Tests" (sample cases) and "Submit Solution" (all cases), real-time runtime and memory metrics drawer, and "Submissions" history tab.
+   - `AssessmentsPage.tsx`: Live-connected assessment catalog displaying challenge cards, duration, difficulty, problem count, and start/resume actions.
+   - `AssessmentWorkspacePage.tsx`: Dedicated assessment environment with server-synchronized countdown timer, multi-problem switcher, Monaco IDE with local storage persistence, test runners, and scorecard modal.
+
 ---
 
 ## 3. Changed Files Log
@@ -168,6 +181,19 @@
 | `frontend/src/components/SignupForm.tsx` | Replaced false "50+ roles" copy with verified track and pattern descriptions. |
 | `frontend/src/pages/HomePage.tsx` | Updated feature highlights to reflect 5 core tracks and 16 DSA patterns. |
 | `frontend/src/pages/LoginPage.tsx` | Replaced fabricated marketing stats with truthful platform capabilities. |
+| `docs/architecture/ONLINE_JUDGE_INFRASTRUCTURE.md` | Infrastructure evaluation and architecture specification for Judge0 CE sandboxing. |
+| `backend/src/lib/models/Submission.ts` | Schema for solution submissions, execution metrics, verdicts, and sanitized test outputs. |
+| `backend/src/lib/models/Assessment.ts` | Schema for timed assessments with problem sets, passing criteria, and tags. |
+| `backend/src/lib/models/AssessmentAttempt.ts` | Schema for timed candidate attempts with authoritative expiry and tab-switch telemetry. |
+| `backend/src/services/judge/types.ts` | Interface definitions for online judge providers and execution contracts. |
+| `backend/src/services/judge/judge0Provider.ts` | Production Judge0 CE client implementation with REST dispatch. |
+| `backend/src/services/judge/mockJudgeProvider.ts` | Deterministic mock judge provider supporting all execution verdicts. |
+| `backend/src/services/judge/judgeService.ts` | Concurrency queue orchestrator and per-user rate limiter for code execution. |
+| `backend/src/server/routes/submissions.ts` | APIs for running sample test cases, official submission, and history. |
+| `backend/src/server/routes/assessments.ts` | Endpoints for catalog listing, starting/resuming attempts, submit, and telemetry. |
+| `backend/tests/judge.test.ts` | 11 automated unit & integration tests for execution verdicts, confidentiality, and rate limiting. |
+| `backend/tests/assessment.test.ts` | 7 automated tests for assessment attempts, server expiry, and score calculation. |
+| `frontend/src/pages/AssessmentWorkspacePage.tsx` | Timed assessment environment with countdown timer, problem switching, and Monaco IDE. |
 
 ---
 
@@ -176,10 +202,12 @@
 | Suite | Checks Run | Passed | Failed | Key Verification Results |
 | :--- | :--- | :--- | :--- | :--- |
 | **Frontend TypeScript Compile** | `npx tsc --noEmit` | **PASS** | 0 | Exit code 0, zero TypeScript errors across all workspace components and routes. |
-| **Frontend Production Build** | `npm run build` (`vite`) | **PASS** | 0 | Built 66 split chunks in 29.80s with clean lazy loading and zero warnings. |
+| **Frontend Production Build** | `npm run build` (`vite`) | **PASS** | 0 | Built chunks in 19.18s with clean lazy loading and zero warnings. |
 | **Frontend Lint** | `npm run lint` (`eslint`) | **PASS** | 0 | Exit code 0, 0 errors across all frontend files. |
 | **Backend TypeScript Compile** | `npx tsc --noEmit` | **PASS** | 0 | Exit code 0, zero TypeScript errors across all models and routes. |
-| **Backend Production Build** | `npm run build` (`tsup`) | **PASS** | 0 | `dist/index.js 76.12 KB` built in 1083ms. |
+| **Backend Production Build** | `npm run build` (`tsup`) | **PASS** | 0 | `dist/index.js 107.02 KB` built in 1117ms. |
+| **Backend Judge & Execution Suite** | `vitest run tests/judge.test.ts` | **11** | **0** | All 11 Phase 4 judge tests pass (AC, WA, TLE, CE, RE, confidentiality, rate limiting). |
+| **Backend Assessment Suite** | `vitest run tests/assessment.test.ts` | **7** | **0** | All 7 Phase 4 assessment tests pass (start, resume, late expiry 403, scorecard). |
 | **Backend DSA API Suite** | `vitest run tests/dsa.test.ts` | **13** | **0** | All 13 Phase 3 automated unit & integration tests pass (roadmaps, problem catalog, confidentiality, admin CRUD). |
 | **Backend Security Regression** | `vitest run tests/security.test.ts` | **8** | **0** | All 8 Phase 1 security regression tests continue to pass. |
 | **FastAPI Evaluator Suite** | `test_evaluator.py` | **8** | **0** | All 8 evaluator regression tests pass. |
