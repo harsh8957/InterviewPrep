@@ -30,7 +30,9 @@ import {
   Sun,
   Moon,
   Monitor,
-  Compass
+  Compass,
+  BarChart3,
+  BookmarkCheck
 } from 'lucide-react';
 
 interface NavItem {
@@ -147,6 +149,8 @@ export const AppShell: React.FC<{ children?: React.ReactNode }> = ({ children })
         title: 'Core Practice',
         items: [
           { to: '/candidate/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+          { to: '/analytics', label: 'Progress & Analytics', icon: BarChart3, badge: 'Live', badgeVariant: 'primary' },
+          { to: '/revision', label: 'Revision & Bookmarks', icon: BookmarkCheck, badge: 'SM-2', badgeVariant: 'secondary' },
           { to: '/setup', label: 'AI Mock Interview', icon: Bot },
           { to: '/results', label: 'Past Results & Feedback', icon: CheckCircle2 },
         ]

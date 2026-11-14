@@ -21,6 +21,9 @@ import systemDesignRoutes from './server/routes/systemDesign';
 import behavioralRoutes from './server/routes/behavioral';
 import companyTrackRoutes from './server/routes/companyTracks';
 import experienceRoutes from './server/routes/experiences';
+import analyticsRoutes from './server/routes/analytics';
+import bookmarksRoutes from './server/routes/bookmarks';
+import profileRoutes from './server/routes/profile';
 
 export const app = express();
 
@@ -53,6 +56,9 @@ app.use('/api/system-design', systemDesignRoutes);
 app.use('/api/behavioral', behavioralRoutes);
 app.use('/api/company-tracks', companyTrackRoutes);
 app.use('/api/experiences', experienceRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/bookmarks', bookmarksRoutes);
+app.use('/api/profile', profileRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

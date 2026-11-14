@@ -166,4 +166,5 @@ const interviewResultSchema = new mongoose.Schema({
 
 const InterviewResult = mongoose.model<IInterviewResult>('InterviewResult', interviewResultSchema);
 
+export { InterviewResult };
 export default InterviewResult; 

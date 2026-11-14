@@ -1,8 +1,8 @@
 # InterviewPrep — Implementation Progress & Tracking
 
 **Repository:** `D:\InterviewPrep\InterviewPrep`
-**Current Phase:** Phase 7 — Company Tracks & Interview Experiences
-**Status:** **PHASE 7 FULLY COMPLETED & VERIFIED** (Ready for User Acceptance)
+**Current Phase:** Phase 8 — Analytics, Bookmarks, Revision & Developer Profiles
+**Status:** **PHASE 8 FULLY COMPLETED & VERIFIED** (Ready for User Acceptance)
 **Last Updated:** 2026-11-14
 
 ---
@@ -18,7 +18,7 @@
 | **Phase 5** | Core CS & System Design Modules | **COMPLETED** | 2026-11-14 |
 | **Phase 6** | Code-Aware & Resume-Driven AI Mock Interviews | **COMPLETED** | 2026-11-14 |
 | **Phase 7** | Company-Specific Prep Tracks & Experiences | **COMPLETED** | 2026-11-14 |
-| **Phase 8** | Progress Analytics, Bookmarks & Profiles | PENDING | — |
+| **Phase 8** | Progress Analytics, Bookmarks & Profiles | **COMPLETED** | 2026-11-14 |
 | **Phase 9** | Security Hardening, Performance & Deployment Readiness | PENDING | — |
 
 ---
@@ -191,6 +191,37 @@
    - Experience Submission Form (`/experiences/new`): Dynamic rounds builder, question builder, anonymity toggle, and real-time PII validation.
    - Admin Moderation Page (`/admin/experiences`): Dedicated review queue for platform administrators.
 
+### 2.8 Progress Analytics, Bookmarks, Revision & Developer Profiles (Phase 8)
+1. **Idempotent Progress Architecture (`UserProgress`):**
+   - Data Truthfulness: Progress counts strictly reflect actual persisted events: accepted coding submissions (`status: 'accepted'`), Core CS concept quiz attempts (`ConceptAttempt`), System Design submissions (`SystemDesignSubmission`), mock interview results (`InterviewResult`), and assessment attempts (`AssessmentAttempt`).
+   - Idempotency & Anti-Inflation: Unique accepted problem IDs are deduplicated. Repeated attempts and multiple accepted submissions for the same problem never double-count towards total solved numbers.
+   - Comprehensive Difficulty Breakdown: Tracks easy, medium, and hard unique solved problems.
+   - Synchronous & On-Demand Engine: `syncUserProgress(userId)` aggregates all historical events from collections with atomic Mongoose updates. `POST /api/analytics/sync` allows manual instant recalculation.
+2. **Calendar-Based Study Streak & Timezone Boundaries:**
+   - Evaluates streaks using user-configured timezone (`Intl.DateTimeFormat` with IANA timezone strings).
+   - Streak Rules: First activity starts a 1-day streak. Same-day activity maintains the streak without double-incrementing. Activity on the immediate consecutive calendar day increments both current and longest streaks. Skipping a calendar day resets current streak to 1 while preserving all-time longest streak.
+3. **Transparent Topic Mastery & Weak-Topic Detection:**
+   - Multi-Factor Formula: Combines unique problems solved per topic with recent quiz accuracy.
+   - Anti-Inflation Safeguard: Candidates cannot be labeled `Mastered` from solving 1 problem with 100% quiz accuracy. Mastered requires $\ge 10$ unique problems solved and $\ge 80\%$ accuracy. `Proficient` requires $\ge 5$ problems and $\ge 70\%$ accuracy.
+   - Automated Weak-Topic Warnings: Identifies topics with $<60\%$ accuracy or high attempts but low unique solved counts, generating prioritized next practice recommendations with direct workspace links.
+4. **Bookmarks & SuperMemo SM-2 Spaced Repetition Queue (`BookmarkList`, `RevisionItem`):**
+   - Custom Lists: Candidates create named bookmark collections with custom descriptions, colors, and icons.
+   - Unified Bookmark Target: Bookmarks link to problems, system design case studies, core CS items, or behavioral questions without deleting underlying platform entities.
+   - Notes Attachment: Candidates attach and edit personal notes, complexity invariants, and trick reminders on any bookmark.
+   - SM-2 Algorithm Implementation:
+     - `Again` (Rating 1): Interval resets to 1 day; ease factor decreased by 0.2 (minimum 1.3).
+     - `Good` (Rating 3): Interval scaled by current ease factor.
+     - `Easy` (Rating 5): Bonus interval multiplier ($1.3 \times \text{easeFactor}$); ease factor increased by 0.15 (maximum 3.0).
+5. **Developer Profiles & Privacy Boundary:**
+   - Schema Extension: Extended `User` model with headline, targetRole, skills, githubUrl, linkedinUrl, experienceYears, bio, learningGoals, timezone, isPublic toggle, and sparse unique `username`.
+   - Privacy Guardrail: Public endpoint `GET /api/profile/public/:username` strictly exposes only verified public stats, top mastered topics, bio, and social links. Registered email, password hash, and internal database identifiers are never exposed. Private profiles return `HTTP 404`.
+6. **Frontend Workspaces:**
+   - Analytics Dashboard (`/analytics`): Solved metrics, 52-week activity heatmap, topic mastery cards, weak-topic detection alert, and database sync trigger.
+   - Revision Workspace (`/revision`): Spaced repetition due queue ("Due Today" vs "All Bookmarks"), SM-2 rating buttons (Again, Good, Easy), notes modal, and custom list creation.
+   - Profile Settings (`/profile`): Full developer profile editing form, timezone selector, public switch, custom username configuration, and direct link to public showcase.
+   - Public Developer Showcase (`/u/:username`): Public view showing verified solved metrics, streak, top mastered topics, and skills.
+   - Coding Workspace Bookmark Button: Direct 1-click bookmarking in `/problems/:slug`.
+
 ---
 
 ## 3. Changed Files Log
@@ -314,6 +345,20 @@
 | `frontend/src/pages/AdminExperiencesPage.tsx` | Administrator governance console for reviewing, approving, rejecting, and handling reported loops. |
 | `frontend/src/components/workspace/AppShell.tsx` | Updated sidebar navigation with Company Tracks, Interview Loops, and Admin Moderation. |
 | `frontend/src/App.tsx` | Configured routes for `/companies/:slug`, `/experiences`, `/experiences/new`, `/experiences/:id`, and `/admin/experiences`. |
+| `backend/src/lib/models/UserProgress.ts` | Schema for progress tracking, unique solved problem sets, streak, daily activity map, and topic mastery. |
+| `backend/src/lib/models/Bookmark.ts` | Schemas for custom bookmark lists and spaced repetition revision queue items (SM-2 intervals). |
+| `backend/src/lib/models/User.ts` | Extended user schema with developer profile subdocument and sparse unique username. |
+| `backend/src/services/progressService.ts` | Idempotent progress calculation engine, timezone-aware streak tracking, and anti-inflation mastery logic. |
+| `backend/src/server/routes/analytics.ts` | Endpoints for overview metrics, 365-day heatmap, topic mastery breakdown, and full progress resync. |
+| `backend/src/server/routes/bookmarks.ts` | Endpoints for bookmark list CRUD, item save/unsave, notes editing, and SM-2 review rating. |
+| `backend/src/server/routes/profile.ts` | Endpoints for authenticated profile editing and privacy-guarded public profile showcase (`/api/profile/public/:username`). |
+| `backend/tests/analyticsPhase8.test.ts` | Automated test suite covering streak formulas, anti-inflation safeguards, SM-2 ratings, and privacy isolation. |
+| `frontend/src/pages/AnalyticsPage.tsx` | Analytics dashboard with solved breakdown, streak counter, 52-week activity heatmap, and weak-topic detection. |
+| `frontend/src/pages/RevisionPage.tsx` | Spaced repetition revision queue ("Due Today" vs "All"), SM-2 rating buttons, notes modal, and list filters. |
+| `frontend/src/pages/ProfilePage.tsx` | Account and developer profile editor with custom username, timezone selector, and public profile toggle. |
+| `frontend/src/pages/PublicProfilePage.tsx` | Public developer showcase route (`/u/:username`) displaying verified stats and top mastered topics. |
+| `frontend/src/pages/ProblemWorkspacePage.tsx` | Added 1-click revision bookmark button in coding workspace header. |
+| `frontend/src/components/CandidateDashboard.tsx` | Added quick-action tiles for Progress & Analytics and Revision & Spaced Repetition. |
 
 ---
 
@@ -326,6 +371,7 @@
 | **Frontend Lint** | `npm run lint` (`eslint`) | **PASS** | 0 | Exit code 0, 0 errors across all frontend files. |
 | **Backend TypeScript Compile** | `npx tsc --noEmit` | **PASS** | 0 | Exit code 0, zero TypeScript errors across all models, routers, and services. |
 | **Backend Production Build** | `npm run build` (`tsc -p tsconfig.json`) | **PASS** | 0 | Built cleanly to `dist/` with zero compiler errors. |
+| **Backend Phase 8 Analytics & Profile** | `tests/analyticsPhase8.test.ts` | **PASS** | 0 | Unit & integration tests for streak calculation across timezones, anti-inflation mastery, SM-2 ratings, and privacy boundaries. |
 | **Backend Phase 7 Company & Experiences** | `tests/companyTracks.test.ts` | **17** | **0** | Verified PII regex scanner, track catalog, pending experience isolation, candidate author access, admin moderation, and cross-user edit rejection. |
 | **Backend Phase 6 AI & Resume Suite** | `tests/interviewPhase6.test.ts` | **14** | **0** | Verified PDF magic byte validation, prompt injection quarantine, resume CRUD IDOR isolation, 7 interview modes, code-aware rubric evaluation, and result persistence. |
 | **Backend Core CS & System Design** | `vitest run tests/coreCS.test.ts` | **19** | **0** | All 19 Phase 5 automated tests pass (confidentiality, server grading, system design drafts, IDOR story CRUD). |

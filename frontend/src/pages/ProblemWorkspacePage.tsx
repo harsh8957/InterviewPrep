@@ -24,6 +24,7 @@ import {
   History,
   Terminal,
   RefreshCw,
+  Bookmark,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -142,8 +143,44 @@ export const ProblemWorkspacePage: React.FC = () => {
   const [submissionHistory, setSubmissionHistory] = useState<SubmissionResponse[]>([]);
   const [historyLoading, setHistoryLoading] = useState<boolean>(false);
   const [executionError, setExecutionError] = useState<string | null>(null);
+  const [isBookmarked, setIsBookmarked] = useState<boolean>(false);
+  const [bookmarkSaving, setBookmarkSaving] = useState<boolean>(false);
 
   const API_URL = import.meta.env.VITE_API_URL || '';
+
+  const handleToggleBookmark = async () => {
+    if (!problem || bookmarkSaving) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      setBookmarkSaving(true);
+      const res = await fetch(`${API_URL}/api/bookmarks/items`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          itemType: 'problem',
+          itemId: problem._id,
+          title: problem.title,
+          category: problem.topics?.[0] || 'Algorithms',
+          difficulty: problem.difficulty,
+          url: `/problems/${problem.slug}`,
+          notes: `Bookmarked from workspace. Patterns: ${(problem.patterns || []).join(', ')}`,
+        }),
+      });
+
+      if (res.ok) {
+        setIsBookmarked(true);
+      }
+    } catch {
+      // Ignored
+    } finally {
+      setBookmarkSaving(false);
+    }
+  };
 
   // Fetch problem details
   useEffect(() => {
@@ -410,6 +447,20 @@ export const ProblemWorkspacePage: React.FC = () => {
                 {problem.title}
               </h1>
               {difficultyBadge}
+              <button
+                onClick={handleToggleBookmark}
+                disabled={bookmarkSaving || isBookmarked}
+                className={cn(
+                  "p-1.5 rounded-lg border transition-colors flex items-center gap-1 text-xs ml-1",
+                  isBookmarked
+                    ? "bg-primary/10 text-primary border-primary/20"
+                    : "border-border text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                )}
+                title={isBookmarked ? "Bookmarked for Spaced Repetition" : "Bookmark for Revision"}
+              >
+                <Bookmark size={14} className={cn(isBookmarked && "fill-primary")} />
+                <span className="hidden sm:inline">{isBookmarked ? "Bookmarked" : "Bookmark"}</span>
+              </button>
             </div>
           </div>
         </div>

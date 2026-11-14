@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   Calendar, Clock, ArrowRight, ChevronRight, Tag, Clipboard,
   TrendingUp, Trophy, Target, Plus, AlertCircle, ExternalLink,
-  Map, Code2, FileCode2, Cpu, Boxes, Building2, Sparkles
+  Map, Code2, FileCode2, Cpu, Boxes, Building2, Sparkles, BarChart3, BookmarkCheck
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '../lib/utils';
@@ -209,6 +209,22 @@ const CandidateDashboard: React.FC = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[
+            {
+              to: '/analytics',
+              title: 'Progress & Analytics',
+              description: 'Verified solved stats, 52-week activity heatmap, and weak-topic detection.',
+              icon: BarChart3,
+              badge: 'Phase 8',
+              badgeColor: 'badge-primary',
+            },
+            {
+              to: '/revision',
+              title: 'Revision & Spaced Repetition',
+              description: 'Scientific SM-2 review queue to retain complex algorithms and patterns.',
+              icon: BookmarkCheck,
+              badge: 'SM-2',
+              badgeColor: 'badge-secondary',
+            },
             {
               to: '/roadmap',
               title: 'DSA Roadmap',

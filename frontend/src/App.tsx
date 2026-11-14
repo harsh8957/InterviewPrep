@@ -22,12 +22,15 @@ const ContactPage = lazy(() => import('./pages/ContactPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage'));
 
 // Workspace pages (lazy loaded)
 const CandidateDashboardPage = lazy(() => import('./pages/CandidateDashboardPage'));
 const HRDashboard = lazy(() => import('./components/HRDashboard'));
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
+const RevisionPage = lazy(() => import('./pages/RevisionPage'));
 const RoadmapPage = lazy(() => import('./pages/RoadmapPage'));
 const ProblemsPage = lazy(() => import('./pages/ProblemsPage'));
 const ProblemWorkspacePage = lazy(() => import('./pages/ProblemWorkspacePage'));
@@ -129,6 +132,7 @@ const App: React.FC = () => {
               <Route path="contact" element={<ContactPage />} />
               <Route path="privacy-policy" element={<PrivacyPolicyPage />} />
               <Route path="terms-of-service" element={<TermsPage />} />
+              <Route path="u/:username" element={<PublicProfilePage />} />
 
               {/* 404 Catch-All within Public Layout */}
               <Route path="*" element={<NotFoundPage />} />
@@ -148,6 +152,22 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['candidate', 'admin']}>
                     <CandidateDashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="analytics"
+                element={
+                  <ProtectedRoute allowedRoles={['candidate', 'admin']}>
+                    <AnalyticsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="revision"
+                element={
+                  <ProtectedRoute allowedRoles={['candidate', 'admin']}>
+                    <RevisionPage />
                   </ProtectedRoute>
                 }
               />
