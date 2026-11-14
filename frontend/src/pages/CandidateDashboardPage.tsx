@@ -8,9 +8,12 @@ const CandidateDashboardPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Redirect if user is not logged in or is not a candidate
-    if (!loading && (!user || user.role !== 'candidate')) {
-      navigate('/login');
+    if (!loading) {
+      if (!user) {
+        navigate('/login');
+      } else if (user.role === 'hr') {
+        navigate('/hr/dashboard');
+      }
     }
   }, [user, loading, navigate]);
 
@@ -25,8 +28,8 @@ const CandidateDashboardPage: React.FC = () => {
     );
   }
 
-  if (!user || user.role !== 'candidate') {
-    return null; // This will be handled by the redirect in useEffect
+  if (!user || user.role === 'hr') {
+    return null;
   }
 
   return (

@@ -164,7 +164,7 @@ const InterviewRoomPage = () => {
         clearInterval(timerRef.current);
       }
     };
-  }, [id, API_BASE_URL, interview, stream]); // Added API_BASE_URL, interview, stream
+  }, [id, API_BASE_URL]);
 
   const formatRemainingTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);

@@ -3,7 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import {
   Calendar, Clock, ArrowRight, ChevronRight, Tag, Clipboard,
-  TrendingUp, Trophy, Target, Plus, AlertCircle, ExternalLink
+  TrendingUp, Trophy, Target, Plus, AlertCircle, ExternalLink,
+  Map, Code2, FileCode2, Cpu, Boxes, Building2, Sparkles
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '../lib/utils';
@@ -120,33 +121,35 @@ const CandidateDashboard: React.FC = () => {
   }
 
   return (
-    <div className="page-transition container-content py-10">
+    <div className="space-y-8">
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold mb-1">
-            Welcome back, <span className="text-gradient">{user?.firstName}</span> 👋
+          <h1 className="text-2xl font-bold mb-1 tracking-tight">
+            Developer Workspace
           </h1>
-          <p className="text-muted-foreground">Here's an overview of your interviews and performance</p>
+          <p className="text-muted-foreground text-sm">
+            Welcome back, <span className="font-semibold text-foreground">{user?.firstName}</span> 👋 — track mock interviews, practice patterns, and prepare for top tech rounds
+          </p>
         </div>
-        <Link to="/setup" className="btn btn-primary flex items-center gap-2 shrink-0">
+        <Link to="/setup" className="btn btn-primary flex items-center gap-2 shrink-0 shadow-sm">
           <Plus size={16} />
-          Start New Interview
+          Start Mock Interview
           <ArrowRight size={16} />
         </Link>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="alert-error mb-8 animate-slide-up" role="alert">
+        <div className="alert-error animate-slide-up" role="alert">
           <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
           <p className="text-sm">{error}</p>
         </div>
       )}
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           {
             icon: TrendingUp,
@@ -171,7 +174,7 @@ const CandidateDashboard: React.FC = () => {
           },
           {
             icon: Calendar,
-            label: 'Upcoming',
+            label: 'Upcoming Scheduled',
             value: upcomingInterviews.length,
             color: 'text-secondary',
             bg: 'bg-secondary/10',
@@ -191,6 +194,99 @@ const CandidateDashboard: React.FC = () => {
           );
         })}
       </div>
+
+      {/* Preparation Tracks & Foundations */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <Sparkles size={18} className="text-primary" />
+              Practice & Curriculum Tracks
+            </h2>
+            <p className="text-xs text-muted-foreground">Structured paths for coding rounds, algorithmic design, and core fundamentals</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[
+            {
+              to: '/roadmap',
+              title: 'DSA Roadmap',
+              description: 'Topic-by-topic algorithmic patterns from Arrays to Dynamic Programming.',
+              icon: Map,
+              badge: '8 Patterns',
+              badgeColor: 'badge-primary',
+            },
+            {
+              to: '/problems',
+              title: 'Problem Bank',
+              description: 'Curated LeetCode-style questions with complexity targets and company tags.',
+              icon: Code2,
+              badge: 'Curated',
+              badgeColor: 'badge-secondary',
+            },
+            {
+              to: '/assessments',
+              title: 'Coding Assessments',
+              description: 'Timed online assessments simulating HackerRank and CodeSignal rounds.',
+              icon: FileCode2,
+              badge: 'Timed',
+              badgeColor: 'badge-warning',
+            },
+            {
+              to: '/core-cs',
+              title: 'Core Computer Science',
+              description: 'OS, DBMS, Networks, and OOP essentials tested in technical rounds.',
+              icon: Cpu,
+              badge: 'Fundamentals',
+              badgeColor: 'badge-muted',
+            },
+            {
+              to: '/system-design',
+              title: 'System Design Lab',
+              description: 'High-level architectures: Rate Limiters, TinyURL, Caching, and Chat.',
+              icon: Boxes,
+              badge: 'Architectural',
+              badgeColor: 'badge-muted',
+            },
+            {
+              to: '/companies',
+              title: 'Company Prep Tracks',
+              description: 'Interview guides and round breakdowns for FAANG and top tech companies.',
+              icon: Building2,
+              badge: 'FAANG+',
+              badgeColor: 'badge-primary',
+            },
+          ].map(track => {
+            const Icon = track.icon;
+            return (
+              <Link
+                key={track.to}
+                to={track.to}
+                className="group relative flex flex-col justify-between rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/50 hover:shadow-md"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                      <Icon size={20} />
+                    </div>
+                    <span className={cn('badge text-[11px]', track.badgeColor)}>{track.badge}</span>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground text-base group-hover:text-primary transition-colors flex items-center justify-between">
+                      {track.title}
+                      <ChevronRight size={16} className="text-muted-foreground group-hover:translate-x-1 transition-transform" />
+                    </h3>
+                    <p className="mt-1 text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                      {track.description}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Upcoming Interviews */}
       <section className="mb-10">

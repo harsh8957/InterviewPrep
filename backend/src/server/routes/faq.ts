@@ -1,6 +1,7 @@
 import express from 'express';
 import { FAQ, FAQCategory } from '../../lib/models/FAQ';
 import { aiService } from '../../services/aiService';
+import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -12,7 +13,7 @@ router.get('/', async (req, res) => {
     // Group by category
     const grouped = categories.map(cat => ({
       ...cat.toObject(),
-      faqs: faqs.filter(faq => faq.category.toString() === cat._id.toString())
+      faqs: faqs.filter(faq => faq.category.toString() === (cat as any)._id.toString())
     }));
     
     res.json(grouped);
@@ -21,7 +22,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/ask-ai', async (req, res) => {
+router.post('/ask-ai', authenticateToken, async (req, res) => {
   try {
     const { question } = req.body;
     if (!question) return res.status(400).json({ message: 'Question required' });

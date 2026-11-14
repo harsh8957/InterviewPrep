@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'; // Removed React
+import { Activity, BrainCircuit, Mic, MicOff, Volume2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useInterview } from '../contexts/InterviewContext';
 import QuestionDisplay from '../components/Interview/QuestionDisplay';
@@ -88,7 +89,10 @@ const InterviewPage = () => {
     startInterview,
     mediaStreamError,
     isInitializingMedia,
-    retryMediaStream
+    retryMediaStream,
+    targetQuestionCount,
+    mainQuestionCount,
+    currentDifficulty
   } = useInterview();
   
   // Check if questions array is valid and has items
@@ -587,14 +591,13 @@ const InterviewPage = () => {
     const finalAnswer = (answer + ' ' + interimTranscriptRef.current).trim();
     
     try {
-      // Save the answer (this will now perform analysis via Gemini)
-      await saveAnswer({
+      const hasNext = await saveAnswer({
         questionId: currentQuestion.id,
         text: finalAnswer
       });
       
       // Check if this was the last question
-      if (currentQuestionIndex >= questions.length - 1) {
+      if (!hasNext) {
         // console.log("Last question answered, completing interview...");
         
         // Get interview ID from session storage or local storage
@@ -670,16 +673,23 @@ const InterviewPage = () => {
       stopRecording();
     }
     
+    let hasNext = true;
+    
     // If there's partial answer text, save it
     if (answer.trim() || interimTranscriptRef.current.trim()) {
       const finalAnswer = (answer + ' ' + interimTranscriptRef.current).trim();
-      saveAnswer({
+      hasNext = await saveAnswer({
         questionId: currentQuestion.id,
         text: finalAnswer
       });
+    } else {
+      hasNext = await saveAnswer({
+        questionId: currentQuestion.id,
+        text: "Skipped question."
+      });
     }
       
-    if (currentQuestionIndex >= questions.length - 1) {
+    if (!hasNext) {
       // console.log("Last question skipped, completing interview...");
       
       // Get interview ID from session storage or local storage
@@ -806,7 +816,7 @@ const InterviewPage = () => {
       // Set initial time remaining and flag only if not already initialized
       if (!isInterviewTimeInitialized) {
         // console.log("[InterviewPage] Total interview timer: Initializing time and flag.");
-        const TOTAL_INTERVIEW_TIME = questions.length * QUESTION_TIME_LIMIT;
+        const TOTAL_INTERVIEW_TIME = targetQuestionCount * QUESTION_TIME_LIMIT;
         setInterviewTimeRemaining(TOTAL_INTERVIEW_TIME);
         setIsInterviewTimeInitialized(true);
         // console.log(`[InterviewPage] Total interview timer: Set initial interviewTimeRemaining to ${TOTAL_INTERVIEW_TIME}, isInterviewTimeInitialized to true.`);
@@ -944,7 +954,7 @@ const InterviewPage = () => {
             )}
           </div>
         </div>
-        <ProgressBar current={currentQuestionIndex + 1} total={questions.length} />
+        <ProgressBar current={currentQuestionIndex + 1} total={targetQuestionCount} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -954,7 +964,17 @@ const InterviewPage = () => {
 
           {/* Answer box */}
           <div className="card">
-            <div className="flex justify-between items-center mb-3">
+            <div className="flex justify-between text-sm text-slate-400 mb-2">
+              <span>Progress</span>
+              <span>{mainQuestionCount} of {targetQuestionCount} main topics completed</span>
+            </div>
+            <div className="w-full bg-slate-800 rounded-full h-2">
+              <div 
+                className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${Math.min(100, Math.max(0, (mainQuestionCount / targetQuestionCount) * 100))}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-between items-center mb-3 mt-4">
               <h3 className="font-semibold">Your Answer</h3>
               <div className="flex items-center gap-1.5 text-sm">
                 <span className="text-muted-foreground">Time remaining:</span>
@@ -991,7 +1011,7 @@ const InterviewPage = () => {
                   aria-label={isRecording ? 'Stop recording' : 'Start recording'}
                   title={isRecording ? 'Stop recording' : 'Start recording'}
                 >
-                  <span className="material-icons text-lg">{isRecording ? 'mic_off' : 'mic'}</span>
+                  {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
                 </button>
 
                 <button
@@ -1006,7 +1026,7 @@ const InterviewPage = () => {
                   aria-label="Read question aloud"
                   title="Read question aloud"
                 >
-                  <span className="material-icons text-lg">volume_up</span>
+                  <Volume2 size={18} />
                 </button>
               </div>
 
@@ -1034,6 +1054,53 @@ const InterviewPage = () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Real-time feedback sidebar */}
+        <div className="w-80 bg-slate-800 border-l border-slate-700 flex flex-col shadow-2xl">
+          <div className="p-5 border-b border-slate-700 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Activity className="w-5 h-5 text-indigo-400" />
+              AI Evaluator
+            </h2>
+            <div className="px-3 py-1 bg-slate-700 rounded-full text-xs font-medium text-slate-300 border border-slate-600">
+              Lvl {currentDifficulty}/10
+            </div>
+          </div>
+          <div className="p-5 flex-grow overflow-y-auto custom-scrollbar">
+            {answers.length > 0 ? (
+              <div className="space-y-4 flex flex-col-reverse">
+                {answers.map((ans, idx) => (
+                  <div key={idx} className="bg-slate-700/50 rounded-lg p-4 border border-slate-600 shadow-inner">
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="text-sm font-medium text-slate-200">
+                        {ans.isCrossQuestion ? "Follow-up Q" : `Main Q${idx + 1}`}
+                      </h4>
+                      {ans.score !== undefined && (
+                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${ans.score >= 80 ? 'bg-green-900/50 text-green-400' : ans.score >= 60 ? 'bg-yellow-900/50 text-yellow-400' : 'bg-red-900/50 text-red-400'}`}>
+                           {ans.score}%
+                         </span>
+                      )}
+                    </div>
+                    {ans.containsCode && (
+                       <div className="mb-2 flex gap-2 flex-wrap">
+                         {ans.timeComplexity && <span className="text-[10px] bg-slate-800 text-cyan-400 px-2 py-1 rounded border border-cyan-900/30">Time: {ans.timeComplexity}</span>}
+                         {ans.spaceComplexity && <span className="text-[10px] bg-slate-800 text-purple-400 px-2 py-1 rounded border border-purple-900/30">Space: {ans.spaceComplexity}</span>}
+                       </div>
+                    )}
+                    <p className="text-sm text-slate-300 leading-relaxed italic border-l-2 border-indigo-500 pl-3">
+                      {ans.feedback || "Awaiting evaluation..."}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-3">
+                <BrainCircuit className="w-10 h-10 text-slate-600 opacity-50" />
+                <p className="text-sm text-center">Real-time analysis will appear here after you answer.</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1082,11 +1149,11 @@ const InterviewPage = () => {
           {/* Navigation */}
           <QuestionNavigation
             currentIndex={currentQuestionIndex}
-            totalQuestions={questions.length}
+            totalQuestions={targetQuestionCount}
             onPrevious={previousQuestion}
             onNext={nextQuestion}
             disablePrevious={currentQuestionIndex === 0 || isRecording || isProcessing}
-            disableNext={currentQuestionIndex === questions.length - 1 || isRecording || isProcessing}
+            disableNext={currentQuestionIndex >= targetQuestionCount - 1 || isRecording || isProcessing || currentQuestionIndex >= questions.length - 1}
           />
 
           {/* Tips */}

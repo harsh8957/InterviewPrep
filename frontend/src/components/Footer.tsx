@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Github, Linkedin, Twitter, BrainCircuit } from 'lucide-react';
+import { Github, Linkedin, BrainCircuit } from 'lucide-react';
 
 const Footer = () => {
   const year = new Date().getFullYear();
@@ -22,26 +22,23 @@ const Footer = () => {
             </p>
             <div className="flex gap-3 pt-1">
               <a
-                href="#"
-                aria-label="Twitter"
+                href="https://github.com/harsh8957/InterviewPrep"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="GitHub Repository"
                 className="btn btn-ghost btn-icon text-muted-foreground hover:text-foreground"
-              >
-                <Twitter size={18} />
-              </a>
-              <a
-                href="#"
-                aria-label="GitHub"
-                className="btn btn-ghost btn-icon text-muted-foreground hover:text-foreground"
+                title="InterviewPrep on GitHub"
               >
                 <Github size={18} />
               </a>
-              <a
-                href="#"
-                aria-label="LinkedIn"
+              <Link
+                to="/contact"
+                aria-label="Contact and Support"
                 className="btn btn-ghost btn-icon text-muted-foreground hover:text-foreground"
+                title="Contact and Inquiries"
               >
                 <Linkedin size={18} />
-              </a>
+              </Link>
             </div>
           </div>
 

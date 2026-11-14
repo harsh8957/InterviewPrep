@@ -86,7 +86,7 @@ const ResultsPage = () => {
           <AlertCircle size={48} className="mx-auto mb-4 text-red-500" />
           <h2 className="text-xl font-semibold text-red-700 mb-2">Error Loading Result</h2>
           <p className="text-red-600">{pageError}</p>
-          <Link to={user?.role === 'hr' ? '/hr-dashboard' : (user?.role === 'candidate' ? '/candidate-dashboard' : '/')} className="btn btn-primary mt-6">
+          <Link to={user?.role === 'hr' ? '/hr/dashboard' : (user?.role === 'candidate' ? '/candidate/dashboard' : '/')} className="btn btn-primary mt-6">
             Go to Dashboard
           </Link>
         </div>
@@ -116,7 +116,7 @@ const ResultsPage = () => {
           <AlertCircle size={48} className="mx-auto mb-4 text-gray-400" />
           <h2 className="text-xl font-semibold text-gray-700 mb-2">Result Not Available</h2>
           <p className="text-gray-600">The interview result could not be loaded or found.</p>
-          <Link to={user?.role === 'hr' ? '/hr-dashboard' : (user?.role === 'candidate' ? '/candidate-dashboard' : '/')} className="btn btn-primary mt-6">
+          <Link to={user?.role === 'hr' ? '/hr/dashboard' : (user?.role === 'candidate' ? '/candidate/dashboard' : '/')} className="btn btn-primary mt-6">
             Go to Dashboard
           </Link>
         </div>
@@ -316,6 +316,12 @@ const ResultsPage = () => {
                   <div className="mb-4">
                     <h4 className="mb-2 text-sm font-medium">Answer Provided:</h4>
                     <p className="text-sm">{answer.text === "Skipped" || !answer.text ? <em>Skipped / No answer</em> : answer.text}</p>
+                    {answer.containsCode && (
+                       <div className="mt-2 flex gap-2 flex-wrap">
+                         {answer.timeComplexity && <span className="text-xs bg-slate-100 text-slate-800 px-2 py-1 rounded border border-slate-200">Time: {answer.timeComplexity}</span>}
+                         {answer.spaceComplexity && <span className="text-xs bg-slate-100 text-slate-800 px-2 py-1 rounded border border-slate-200">Space: {answer.spaceComplexity}</span>}
+                       </div>
+                    )}
                   </div>
 
                   <div className="mb-4 flex items-center justify-between">
@@ -329,6 +335,12 @@ const ResultsPage = () => {
                          answer.score && answer.score >= 60 ? 'Satisfactory' :
                          (answer.text === "Skipped" ? 'Skipped' : 'Needs Improvement')}
                       </span>
+                      {answer.difficulty !== undefined && (
+                        <span className="text-sm font-medium px-2 py-1 bg-slate-100 rounded text-slate-700">Level {answer.difficulty}/10</span>
+                      )}
+                      {answer.isCrossQuestion && (
+                        <span className="text-sm font-medium px-2 py-1 bg-indigo-100 rounded text-indigo-700">Follow-up</span>
+                      )}
                     </div>
                     
                     {answer.text && answer.text !== "Skipped" ? (

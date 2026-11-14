@@ -7,7 +7,8 @@ import { useAuth } from '../contexts/AuthContext';
 // Define the interface for the interview result
 interface InterviewAnswer {
   questionId: string;
-  text: string;
+  text?: string;
+  answerText?: string;
   score?: number;
   feedback?: string;
   strengths?: string[];
@@ -235,7 +236,7 @@ const ResultDetailPage = () => {
     <div className="page-transition container mx-auto px-4 py-10">
       <div className="mx-auto max-w-4xl">
         <Link 
-          to="/candidate/dashboard" 
+          to={user?.role === 'hr' ? '/hr/dashboard' : '/candidate/dashboard'} 
           className="flex items-center text-primary mb-6 hover:underline"
         >
           <ArrowLeft size={16} className="mr-1" />
@@ -351,7 +352,7 @@ const ResultDetailPage = () => {
                 <div className="p-4">
                   <div className="mb-4">
                     <h4 className="mb-2 text-sm font-medium">Your Answer:</h4>
-                    <p className="text-sm">{answer.text || "No answer provided"}</p>
+                    <p className="text-sm">{answer.answerText || answer.text || "No answer provided"}</p>
                   </div>
 
                   <div className="mb-4 flex items-center justify-between">
@@ -367,7 +368,7 @@ const ResultDetailPage = () => {
                       </span>
                     </div>
                     
-                    {answer.text ? (
+                    {(answer.answerText || answer.text) ? (
                       <div className="flex items-center text-sm text-success">
                         <CheckCircle size={16} className="mr-1" />
                         <span>Answered</span>

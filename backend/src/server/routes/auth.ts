@@ -1,13 +1,15 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../../lib/models/User';
+import RevokedToken from '../../lib/models/RevokedToken';
+import { JWT_SECRET } from '../../lib/jwt';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
+import { validateBody, signupSchema, loginSchema } from '../../lib/validation';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Signup route
-router.post('/signup', async (req, res) => {
+router.post('/signup', validateBody(signupSchema), async (req, res) => {
   try {
     const {
       email,
@@ -63,7 +65,7 @@ router.post('/signup', async (req, res) => {
 });
 
 // Login route
-router.post('/login', async (req, res) => {
+router.post('/login', validateBody(loginSchema), async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -118,9 +120,34 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
-// Logout route (client-side only, just for completeness)
-router.post('/logout', (req, res) => {
-  res.json({ message: 'Logged out successfully' });
+// Logout route with token revocation
+router.post('/logout', async (req, res) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (token) {
+      try {
+        const decoded = jwt.decode(token) as { exp?: number } | null;
+        const expiresAt = decoded?.exp
+          ? new Date(decoded.exp * 1000)
+          : new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+        await RevokedToken.findOneAndUpdate(
+          { token },
+          { token, expiresAt },
+          { upsert: true, new: true }
+        );
+      } catch (tokenErr) {
+        console.warn('Could not decode token during logout:', tokenErr);
+      }
+    }
+
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ message: 'Error logging out' });
+  }
 });
 
 export default router; 

@@ -6,10 +6,10 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 
 const stats = [
-  { value: '10K+', label: 'Interviews Completed', icon: TrendingUp },
-  { value: '95%', label: 'Success Rate', icon: Award },
-  { value: '50+', label: 'Job Roles Covered', icon: Users },
-  { value: '4.9★', label: 'Average Rating', icon: Star },
+  { value: 'Adaptive AI', label: 'Real-Time Evaluation', icon: TrendingUp },
+  { value: '50+ Roles', label: 'Technical & CS Tracks', icon: Award },
+  { value: 'Speech & Text', label: 'Voice & Written Analysis', icon: Users },
+  { value: 'Zero Fake Data', label: 'Honest Scored Feedback', icon: Star },
 ];
 
 const features = [
@@ -264,20 +264,20 @@ const HomePage = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="card-gradient p-6 flex flex-col gap-2">
-                <div className="text-4xl font-bold text-gradient">10K+</div>
-                <p className="text-sm text-muted-foreground">Successful interviews practiced</p>
+                <div className="text-3xl font-bold text-gradient">Instant AI</div>
+                <p className="text-sm text-muted-foreground">Detailed constructive feedback on every technical answer</p>
               </div>
               <div className="card p-6 flex flex-col gap-2 border-primary/20">
-                <div className="text-4xl font-bold text-gradient">50+</div>
-                <p className="text-sm text-muted-foreground">Job roles covered across industries</p>
+                <div className="text-3xl font-bold text-gradient">50+ Roles</div>
+                <p className="text-sm text-muted-foreground">Frontend, Backend, ML, Mobile, DevOps, and CS domains</p>
               </div>
               <div className="card p-6 flex flex-col gap-2 border-secondary/20">
-                <div className="text-4xl font-bold text-gradient">95%</div>
-                <p className="text-sm text-muted-foreground">Candidates report improved confidence</p>
+                <div className="text-3xl font-bold text-gradient">Adaptive</div>
+                <p className="text-sm text-muted-foreground">Follow-up cross-questions tailored to your depth</p>
               </div>
               <div className="card-gradient p-6 flex flex-col gap-2">
-                <div className="text-4xl font-bold text-gradient">4.9★</div>
-                <p className="text-sm text-muted-foreground">Average user satisfaction rating</p>
+                <div className="text-3xl font-bold text-gradient">Accurate</div>
+                <p className="text-sm text-muted-foreground">Objective scoring across technical depth and clarity</p>
               </div>
             </div>
           </div>

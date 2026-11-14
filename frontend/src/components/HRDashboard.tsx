@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import {
   ChevronRight, Plus, X, Calendar, Users, CheckCircle2,
-  XCircle, AlertCircle, Copy, ExternalLink, BarChart2, TrendingUp
+  XCircle, AlertCircle, Copy, ExternalLink, BarChart2, TrendingUp,
+  Search, Filter
 } from 'lucide-react';
 
 import { useNavigate } from 'react-router-dom';
@@ -50,6 +51,8 @@ const HRDashboard: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'completed' | 'cancelled'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => { fetchInterviews(); }, []);
 
@@ -165,26 +168,43 @@ const HRDashboard: React.FC = () => {
   const completed = interviews.filter(i => i.status === 'completed').length;
   const cancelled = interviews.filter(i => i.status === 'cancelled').length;
 
+  const filteredInterviews = useMemo(() => {
+    return interviews.filter(interview => {
+      if (statusFilter !== 'all' && interview.status !== statusFilter) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const candidateName = `${interview.candidate?.firstName || ''} ${interview.candidate?.lastName || ''}`.toLowerCase();
+        const email = (interview.candidate?.email || '').toLowerCase();
+        const title = (interview.title || '').toLowerCase();
+        const role = (interview.jobRole || '').toLowerCase();
+        return candidateName.includes(q) || email.includes(q) || title.includes(q) || role.includes(q);
+      }
+      return true;
+    });
+  }, [interviews, statusFilter, searchQuery]);
+
   const inputClass = "input text-sm";
   const labelClass = "label";
 
   return (
-    <div className="page-transition container-content py-10">
+    <div className="space-y-8">
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold mb-1">
-            HR Dashboard
+          <h1 className="text-2xl font-bold mb-1 tracking-tight">
+            Recruiter Workspace
           </h1>
-          <p className="text-muted-foreground">
-            Welcome, <span className="font-medium text-foreground">{user?.firstName}</span> — manage and schedule interviews
+          <p className="text-muted-foreground text-sm">
+            Welcome, <span className="font-semibold text-foreground">{user?.firstName}</span> — schedule, monitor and evaluate candidate technical interviews
           </p>
         </div>
         <button
           id="schedule-interview-btn"
           onClick={() => setShowNewInterview(true)}
-          className="btn btn-primary flex items-center gap-2 shrink-0"
+          className="btn btn-primary flex items-center gap-2 shrink-0 shadow-sm"
         >
           <Plus size={16} />
           Schedule Interview
@@ -192,7 +212,7 @@ const HRDashboard: React.FC = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Total', value: interviews.length, icon: Users, color: 'text-primary', bg: 'bg-primary/10' },
           { label: 'Scheduled', value: scheduled, icon: Calendar, color: 'text-secondary', bg: 'bg-secondary/10' },
@@ -374,12 +394,67 @@ const HRDashboard: React.FC = () => {
       )}
 
       {/* Interviews Table */}
-      <div className="card overflow-hidden p-0">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="font-semibold">All Interviews</h2>
-          {isLoading && (
-            <div className="w-5 h-5 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
-          )}
+      <div className="card overflow-hidden p-0 border border-border">
+        {/* Table Header & Controls */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-6 py-4 border-b border-border bg-muted/20">
+          <div>
+            <h2 className="font-semibold text-foreground text-base">Candidate Interviews</h2>
+            <p className="text-xs text-muted-foreground">Monitor schedules, access interview rooms, and inspect evaluation scorecards</p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {/* Search Input */}
+            <div className="relative min-w-[220px]">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search candidates, titles..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="input input-sm pl-9 pr-8 text-xs w-full"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
+            {/* Status Filter Tabs */}
+            <div className="inline-flex rounded-lg border border-border bg-muted/40 p-1 text-xs">
+              {(
+                [
+                  { id: 'all', label: 'All', count: interviews.length },
+                  { id: 'scheduled', label: 'Scheduled', count: scheduled },
+                  { id: 'completed', label: 'Completed', count: completed },
+                  { id: 'cancelled', label: 'Cancelled', count: cancelled },
+                ] as const
+              ).map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={cn(
+                    'px-2.5 py-1 rounded-md font-medium transition-colors flex items-center gap-1.5',
+                    statusFilter === tab.id
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <span>{tab.label}</span>
+                  <span className={cn(
+                    'text-[10px] px-1.5 py-0.2 rounded-full',
+                    statusFilter === tab.id ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                  )}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {!isLoading && interviews.length === 0 ? (
@@ -392,6 +467,18 @@ const HRDashboard: React.FC = () => {
             >
               <Plus size={14} />
               Schedule Your First Interview
+            </button>
+          </div>
+        ) : !isLoading && filteredInterviews.length === 0 ? (
+          <div className="flex flex-col items-center py-16 text-center gap-3">
+            <Filter size={36} className="text-muted-foreground/40" />
+            <p className="text-muted-foreground font-medium">No interviews found matching your criteria.</p>
+            <p className="text-xs text-muted-foreground">Try clearing the search query or changing the status filter.</p>
+            <button
+              onClick={() => { setStatusFilter('all'); setSearchQuery(''); }}
+              className="btn btn-outline btn-sm mt-1"
+            >
+              Reset Filters
             </button>
           </div>
         ) : (
@@ -407,7 +494,7 @@ const HRDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {interviews.map(interview => {
+                {filteredInterviews.map(interview => {
                   const { label, className } = getStatusMeta(interview);
                   const active = isInterviewActive(interview);
                   return (

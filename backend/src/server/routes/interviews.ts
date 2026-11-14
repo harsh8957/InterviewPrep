@@ -5,6 +5,7 @@ import { authenticateToken, requireHR, AuthRequest } from '../middleware/auth'; 
 import InterviewRoom from '../../lib/models/InterviewRoom';
 import User from '../../lib/models/User';
 import { v4 as uuidv4 } from 'uuid';
+import { validateBody, scheduleInterviewSchema } from '../../lib/validation';
 
 const router = express.Router();
 
@@ -36,7 +37,7 @@ router.get('/candidate', authenticateToken, async (req: AuthRequest, res) => {
 });
 
 // Create new interview
-router.post('/', authenticateToken, requireHR, async (req: AuthRequest, res) => {
+router.post('/', authenticateToken, requireHR, validateBody(scheduleInterviewSchema), async (req: AuthRequest, res) => {
   try {
     const { 
       title, 
@@ -164,12 +165,21 @@ router.put('/:id/complete', authenticateToken, async (req: AuthRequest, res) => 
 });
 
 // Auto-complete interview based on scheduled time
-router.put('/:id/auto-complete', async (req, res) => {
+router.put('/:id/auto-complete', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const interview = await InterviewRoom.findById(req.params.id);
 
     if (!interview) {
       return res.status(404).json({ message: 'Interview not found' });
+    }
+
+    const candidateId = interview.candidate ? interview.candidate.toString() : null;
+    const hrId = interview.hr ? interview.hr.toString() : null;
+    const currentUserId = req.user?.userId;
+    const currentUserRole = req.user?.role;
+
+    if (currentUserId !== candidateId && currentUserId !== hrId && currentUserRole !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to auto-complete this interview' });
     }
 
     if (interview.status !== 'scheduled') {
@@ -195,7 +205,7 @@ router.put('/:id/auto-complete', async (req, res) => {
 });
 
 // Fix the endpoint URL to match what's used in the InterviewRoomPage
-router.put('/auto-complete/:id', async (req, res) => {
+router.put('/auto-complete/:id', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const idParam = req.params.id;
     let interview;
@@ -216,6 +226,15 @@ router.put('/auto-complete/:id', async (req, res) => {
       console.log(`[Auto-Complete] Interview not found by _id or roomLink for param: ${idParam}`);
       return res.status(404).json({ message: 'Interview not found' });
     }
+
+    const candidateId = interview.candidate ? interview.candidate.toString() : null;
+    const hrId = interview.hr ? interview.hr.toString() : null;
+    const currentUserId = req.user?.userId;
+    const currentUserRole = req.user?.role;
+
+    if (currentUserId !== candidateId && currentUserId !== hrId && currentUserRole !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to auto-complete this interview' });
+    }
     
     console.log(`[Auto-Complete] Found interview ${interview._id} with status ${interview.status}`);
 
@@ -234,8 +253,8 @@ router.put('/auto-complete/:id', async (req, res) => {
   }
 });
 
-// Get interview by room ID (for candidates to join)
-router.get('/room/:roomId', async (req, res) => {
+// Get interview by room ID (for candidates or HR to join)
+router.get('/room/:roomId', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const roomLink = `/interview-room/${req.params.roomId}`;
     const interview = await InterviewRoom.findOne({ roomLink })
@@ -246,6 +265,15 @@ router.get('/room/:roomId', async (req, res) => {
       return res.status(404).json({ message: 'Interview not found' });
     }
 
+    const candidateId = interview.candidate ? ((interview.candidate as any)._id || interview.candidate).toString() : null;
+    const hrId = interview.hr ? ((interview.hr as any)._id || interview.hr).toString() : null;
+    const currentUserId = req.user?.userId;
+    const currentUserRole = req.user?.role;
+
+    if (currentUserId !== candidateId && currentUserId !== hrId && currentUserRole !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to access this interview room' });
+    }
+
     res.json(interview);
   } catch (error) {
     console.error('Error fetching interview by room ID:', error);
@@ -254,13 +282,13 @@ router.get('/room/:roomId', async (req, res) => {
 });
 
 // Complete interview by room ID
-router.put('/room/:roomId/complete', async (req, res) => {
+router.put('/room/:roomId/complete', authenticateToken, async (req: AuthRequest, res) => {
   try {
     console.log(`Attempting to complete interview with room ID: ${req.params.roomId}`);
     const roomLink = `/interview-room/${req.params.roomId}`;
     
     console.log(`Looking for interview with roomLink: ${roomLink}`);
-    const interview = await InterviewRoom.findOne({ roomLink });
+    let interview = await InterviewRoom.findOne({ roomLink });
 
     if (!interview) {
       console.log(`No interview found with roomLink: ${roomLink}`);
@@ -269,29 +297,25 @@ router.put('/room/:roomId/complete', async (req, res) => {
       try {
         console.log(`Trying direct ID lookup for: ${req.params.roomId}`);
         const interviewById = await InterviewRoom.findById(req.params.roomId);
-        
-        if (!interviewById) {
-          console.log(`No interview found by direct ID either: ${req.params.roomId}`);
-          return res.status(404).json({ message: 'Interview not found' });
+        if (interviewById) {
+          interview = interviewById;
         }
-        
-        if (interviewById.status !== 'scheduled') {
-          console.log(`Interview found by ID but status is: ${interviewById.status}`);
-          return res.status(400).json({ message: 'Interview is already completed or cancelled' });
-        }
-        
-        console.log(`Updating interview status to completed for ID: ${interviewById._id}`);
-        interviewById.status = 'completed';
-        await interviewById.save();
-        
-        return res.json({
-          message: 'Interview marked as completed via direct ID',
-          interview: interviewById
-        });
       } catch (idError) {
         console.error('Error in direct ID lookup:', idError);
-        return res.status(404).json({ message: 'Interview not found by room ID or direct ID' });
       }
+    }
+
+    if (!interview) {
+      return res.status(404).json({ message: 'Interview not found by room ID or direct ID' });
+    }
+
+    const candidateId = interview.candidate ? interview.candidate.toString() : null;
+    const hrId = interview.hr ? interview.hr.toString() : null;
+    const currentUserId = req.user?.userId;
+    const currentUserRole = req.user?.role;
+
+    if (currentUserId !== candidateId && currentUserId !== hrId && currentUserRole !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to complete this interview' });
     }
 
     if (interview.status !== 'scheduled') {
@@ -314,11 +338,11 @@ router.put('/room/:roomId/complete', async (req, res) => {
 });
 
 // Generate interview questions using Gemini
-router.post('/gemini/questions', async (req, res) => {
+router.post('/gemini/questions', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const { jobRole, experienceLevel, count = 4 } = req.body; // experienceLevel is not used by the python service directly for question fetching but kept for consistency with original signature
+    const { jobRole, experienceLevel } = req.body; 
     
-    if (!jobRole) { // experienceLevel is not strictly required by the python service for this endpoint
+    if (!jobRole) {
       return res.status(400).json({ message: 'Job role is required' });
     }
 
@@ -326,8 +350,12 @@ router.post('/gemini/questions', async (req, res) => {
 
     try {
       const response = await axios.post(`${evaluatorServiceUrl}/fetch-questions`, {
-        role: jobRole, // Python service expects 'role'
-        num_questions: count,
+        role: jobRole,
+        experience_level: experienceLevel || 'mid-level',
+        num_questions: 1, // Force only 1 starting question
+      }, {
+        headers: { 'x-internal-service-key': process.env.INTERNAL_SERVICE_KEY || '' },
+        timeout: 15000
       });
 
       // The Python service returns an array of objects: [{ id: number, text: string }]
@@ -357,7 +385,7 @@ router.post('/gemini/questions', async (req, res) => {
 });
 
 // Analyze interview answer using Gemini
-router.post('/gemini/analyze', async (req, res) => {
+router.post('/gemini/analyze', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { question, answer, jobRole, experienceLevel } = req.body;
     
@@ -371,8 +399,11 @@ router.post('/gemini/analyze', async (req, res) => {
       const response = await axios.post(`${evaluatorServiceUrl}/evaluate-answer`, {
         question,
         answer,
-        role: jobRole, // Pass jobRole as role to the evaluator service
-        // experienceLevel is not explicitly used by the python service's evaluate-answer endpoint currently
+        role: jobRole,
+        experience_level: experienceLevel || 'mid-level',
+      }, {
+        headers: { 'x-internal-service-key': process.env.INTERNAL_SERVICE_KEY || '' },
+        timeout: 15000
       });
 
       // Python service returns { score: float (0.0-1.0), feedback: string }
@@ -407,8 +438,62 @@ router.post('/gemini/analyze', async (req, res) => {
   }
 });
 
+// Analyze answer and get next question using Gemini
+router.post('/gemini/evaluate-and-next', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { currentQuestion, currentAnswer, jobRole, history, currentDifficulty } = req.body;
+    
+    if (!currentQuestion || !currentAnswer) {
+      return res.status(400).json({ message: 'Question and answer are required' });
+    }
+
+    const evaluatorServiceUrl = process.env.EVALUATOR_SERVICE_URL || 'http://localhost:8001';
+
+    try {
+      const response = await axios.post(`${evaluatorServiceUrl}/evaluate-and-next`, {
+        current_question: currentQuestion,
+        current_answer: currentAnswer,
+        role: jobRole,
+        history: history || [],
+        current_difficulty: currentDifficulty || 5
+      }, {
+        headers: { 'x-internal-service-key': process.env.INTERNAL_SERVICE_KEY || '' },
+        timeout: 20000
+      });
+
+      if (response.data && typeof response.data.score === 'number' && typeof response.data.feedback === 'string' && typeof response.data.next_question === 'string') {
+        const result = {
+          score: Math.round(response.data.score * 100), 
+          feedback: response.data.feedback,
+          nextQuestion: response.data.next_question,
+          isCrossQuestion: response.data.is_cross_question,
+          newDifficulty: response.data.current_difficulty,
+          containsCode: response.data.contains_code,
+          timeComplexity: response.data.time_complexity,
+          spaceComplexity: response.data.space_complexity
+        };
+        res.json(result);
+      } else {
+        console.error('Unexpected response format from evaluator service for evaluate-and-next:', response.data);
+        res.status(500).json({ message: 'Error evaluating answer: Unexpected response from evaluator service' });
+      }
+    } catch (apiError: any) {
+      console.error('Error calling evaluator service for evaluate-and-next:', apiError.message);
+      if (apiError.response) {
+        return res.status(apiError.response.status || 500).json({
+          message: apiError.response.data?.detail || 'Error from evaluator service'
+        });
+      }
+      res.status(500).json({ message: 'Error from evaluator service' });
+    }
+  } catch (error) {
+    console.error('Error with evaluate-and-next:', error);
+    res.status(500).json({ message: 'Error processing dynamic evaluation' });
+  }
+});
+
 // Text-to-speech for questions
-router.post('/tts', async (req, res) => {
+router.post('/tts', authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { text } = req.body;
     
